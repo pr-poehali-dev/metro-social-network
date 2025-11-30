@@ -96,6 +96,27 @@ const Index = () => {
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isFindFriendsOpen, setIsFindFriendsOpen] = useState(false);
   const [isAddMusicOpen, setIsAddMusicOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState({
+    privacy: {
+      profileVisibility: 'everyone',
+      postsVisibility: 'friends',
+      friendsVisibility: 'friends'
+    },
+    notifications: {
+      likes: true,
+      comments: true,
+      friendRequests: true,
+      messages: true
+    },
+    interface: {
+      language: 'ru',
+      fontSize: 'medium'
+    },
+    security: {
+      twoFactor: false
+    }
+  });
   const [newMessage, setNewMessage] = useState('');
   const [newPost, setNewPost] = useState('');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -876,7 +897,8 @@ const Index = () => {
                           <Button onClick={() => setIsEditProfileOpen(true)} className="bg-[#0078D7] hover:bg-[#005a9e] rounded-none">
                             Редактировать профиль
                           </Button>
-                          <Button variant="outline" className="rounded-none border-2">
+                          <Button onClick={() => setIsSettingsOpen(true)} variant="outline" className="rounded-none border-2">
+                            <Icon name="Settings" size={16} className="mr-2" />
                             Настройки
                           </Button>
                         </div>
@@ -1252,6 +1274,331 @@ const Index = () => {
             </Button>
             <Button onClick={() => { setIsAddMusicOpen(false); toast({ title: 'Трек добавлен в библиотеку' }); }} className="bg-[#9b87f5] hover:bg-[#8b77e5] rounded-none">
               Добавить
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <DialogContent className="rounded-none max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon name="Settings" size={24} />
+              Настройки
+            </DialogTitle>
+          </DialogHeader>
+          
+          <Tabs defaultValue="privacy" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="privacy">Приватность</TabsTrigger>
+              <TabsTrigger value="notifications">Уведомления</TabsTrigger>
+              <TabsTrigger value="interface">Интерфейс</TabsTrigger>
+              <TabsTrigger value="security">Безопасность</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="privacy" className="space-y-6 py-4">
+              <div>
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <Icon name="Eye" size={18} className="text-[#0078D7]" />
+                  Видимость профиля
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Кто может видеть мой профиль</Label>
+                      <p className="text-sm text-gray-500">Управление доступом к вашей странице</p>
+                    </div>
+                    <Select 
+                      value={settings.privacy.profileVisibility}
+                      onValueChange={(v) => setSettings({
+                        ...settings,
+                        privacy: { ...settings.privacy, profileVisibility: v }
+                      })}
+                    >
+                      <SelectTrigger className="w-40 rounded-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="everyone">Все</SelectItem>
+                        <SelectItem value="friends">Друзья</SelectItem>
+                        <SelectItem value="only-me">Только я</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Кто может видеть мои посты</Label>
+                      <p className="text-sm text-gray-500">Контроль видимости публикаций</p>
+                    </div>
+                    <Select 
+                      value={settings.privacy.postsVisibility}
+                      onValueChange={(v) => setSettings({
+                        ...settings,
+                        privacy: { ...settings.privacy, postsVisibility: v }
+                      })}
+                    >
+                      <SelectTrigger className="w-40 rounded-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="everyone">Все</SelectItem>
+                        <SelectItem value="friends">Друзья</SelectItem>
+                        <SelectItem value="only-me">Только я</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Кто может видеть моих друзей</Label>
+                      <p className="text-sm text-gray-500">Кто увидит ваш список друзей</p>
+                    </div>
+                    <Select 
+                      value={settings.privacy.friendsVisibility}
+                      onValueChange={(v) => setSettings({
+                        ...settings,
+                        privacy: { ...settings.privacy, friendsVisibility: v }
+                      })}
+                    >
+                      <SelectTrigger className="w-40 rounded-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="everyone">Все</SelectItem>
+                        <SelectItem value="friends">Друзья</SelectItem>
+                        <SelectItem value="only-me">Только я</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="notifications" className="space-y-6 py-4">
+              <div>
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <Icon name="Bell" size={18} className="text-[#0078D7]" />
+                  Управление уведомлениями
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-3 border-2 rounded">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-[#E81123]/10">
+                        <Icon name="Heart" size={20} className="text-[#E81123]" />
+                      </div>
+                      <div>
+                        <Label>Лайки</Label>
+                        <p className="text-sm text-gray-500">Уведомления о новых лайках</p>
+                      </div>
+                    </div>
+                    <Switch 
+                      checked={settings.notifications.likes}
+                      onCheckedChange={(checked) => setSettings({
+                        ...settings,
+                        notifications: { ...settings.notifications, likes: checked }
+                      })}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-3 border-2 rounded">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-[#0078D7]/10">
+                        <Icon name="MessageCircle" size={20} className="text-[#0078D7]" />
+                      </div>
+                      <div>
+                        <Label>Комментарии</Label>
+                        <p className="text-sm text-gray-500">Уведомления о комментариях</p>
+                      </div>
+                    </div>
+                    <Switch 
+                      checked={settings.notifications.comments}
+                      onCheckedChange={(checked) => setSettings({
+                        ...settings,
+                        notifications: { ...settings.notifications, comments: checked }
+                      })}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-3 border-2 rounded">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-[#7FBA00]/10">
+                        <Icon name="UserPlus" size={20} className="text-[#7FBA00]" />
+                      </div>
+                      <div>
+                        <Label>Заявки в друзья</Label>
+                        <p className="text-sm text-gray-500">Уведомления о новых заявках</p>
+                      </div>
+                    </div>
+                    <Switch 
+                      checked={settings.notifications.friendRequests}
+                      onCheckedChange={(checked) => setSettings({
+                        ...settings,
+                        notifications: { ...settings.notifications, friendRequests: checked }
+                      })}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-3 border-2 rounded">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-[#FFB900]/10">
+                        <Icon name="Mail" size={20} className="text-[#FFB900]" />
+                      </div>
+                      <div>
+                        <Label>Сообщения</Label>
+                        <p className="text-sm text-gray-500">Уведомления о новых сообщениях</p>
+                      </div>
+                    </div>
+                    <Switch 
+                      checked={settings.notifications.messages}
+                      onCheckedChange={(checked) => setSettings({
+                        ...settings,
+                        notifications: { ...settings.notifications, messages: checked }
+                      })}
+                    />
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="interface" className="space-y-6 py-4">
+              <div>
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <Icon name="Monitor" size={18} className="text-[#0078D7]" />
+                  Настройки интерфейса
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Язык интерфейса</Label>
+                      <p className="text-sm text-gray-500">Выберите предпочитаемый язык</p>
+                    </div>
+                    <Select 
+                      value={settings.interface.language}
+                      onValueChange={(v) => setSettings({
+                        ...settings,
+                        interface: { ...settings.interface, language: v }
+                      })}
+                    >
+                      <SelectTrigger className="w-40 rounded-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ru">Русский</SelectItem>
+                        <SelectItem value="en">English</SelectItem>
+                        <SelectItem value="uk">Українська</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Размер шрифта</Label>
+                      <p className="text-sm text-gray-500">Комфортный размер текста</p>
+                    </div>
+                    <Select 
+                      value={settings.interface.fontSize}
+                      onValueChange={(v) => setSettings({
+                        ...settings,
+                        interface: { ...settings.interface, fontSize: v }
+                      })}
+                    >
+                      <SelectTrigger className="w-40 rounded-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="small">Маленький</SelectItem>
+                        <SelectItem value="medium">Средний</SelectItem>
+                        <SelectItem value="large">Большой</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-3 border-2 rounded">
+                    <div>
+                      <Label>Тёмная тема</Label>
+                      <p className="text-sm text-gray-500">Тёмное оформление интерфейса</p>
+                    </div>
+                    <Switch 
+                      checked={isDarkMode}
+                      onCheckedChange={toggleTheme}
+                    />
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="security" className="space-y-6 py-4">
+              <div>
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <Icon name="Shield" size={18} className="text-[#0078D7]" />
+                  Безопасность аккаунта
+                </h3>
+                <div className="space-y-4">
+                  <Card className="p-4 rounded-none border-2">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <Label>Двухфакторная аутентификация</Label>
+                        <p className="text-sm text-gray-500">Дополнительная защита входа</p>
+                      </div>
+                      <Switch 
+                        checked={settings.security.twoFactor}
+                        onCheckedChange={(checked) => {
+                          setSettings({
+                            ...settings,
+                            security: { ...settings.security, twoFactor: checked }
+                          });
+                          toast({ title: checked ? '2FA включена' : '2FA выключена' });
+                        }}
+                      />
+                    </div>
+                    {settings.security.twoFactor && (
+                      <div className="mt-3 p-3 bg-[#7FBA00]/10 rounded flex items-center gap-2 text-sm">
+                        <Icon name="CheckCircle" size={16} className="text-[#7FBA00]" />
+                        <span>Ваш аккаунт защищён двухфакторной аутентификацией</span>
+                      </div>
+                    )}
+                  </Card>
+                  
+                  <Card className="p-4 rounded-none border-2">
+                    <Label className="mb-3 block">Смена пароля</Label>
+                    <div className="space-y-3">
+                      <Input type="password" placeholder="Текущий пароль" className="rounded-none border-2" />
+                      <Input type="password" placeholder="Новый пароль" className="rounded-none border-2" />
+                      <Input type="password" placeholder="Повторите новый пароль" className="rounded-none border-2" />
+                      <Button className="w-full bg-[#0078D7] hover:bg-[#005a9e] rounded-none">
+                        <Icon name="Lock" size={16} className="mr-2" />
+                        Изменить пароль
+                      </Button>
+                    </div>
+                  </Card>
+                  
+                  <Card className="p-4 rounded-none border-2 border-[#E81123]/30 bg-[#E81123]/5">
+                    <Label className="mb-3 block text-[#E81123]">Опасная зона</Label>
+                    <p className="text-sm text-gray-600 mb-3">Действие нельзя будет отменить</p>
+                    <Button variant="outline" className="w-full border-[#E81123] text-[#E81123] hover:bg-[#E81123] hover:text-white rounded-none">
+                      <Icon name="Trash2" size={16} className="mr-2" />
+                      Удалить аккаунт
+                    </Button>
+                  </Card>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+          
+          <DialogFooter className="mt-6">
+            <Button variant="outline" onClick={() => setIsSettingsOpen(false)} className="rounded-none">
+              Закрыть
+            </Button>
+            <Button 
+              onClick={() => {
+                setIsSettingsOpen(false);
+                toast({ title: 'Настройки сохранены' });
+              }} 
+              className="bg-[#0078D7] hover:bg-[#005a9e] rounded-none"
+            >
+              <Icon name="Save" size={16} className="mr-2" />
+              Сохранить изменения
             </Button>
           </DialogFooter>
         </DialogContent>
