@@ -125,6 +125,8 @@ const Index = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [viewingProfile, setViewingProfile] = useState<UserProfile | null>(null);
   const [subscribedUsers, setSubscribedUsers] = useState<Set<number>>(new Set());
+  const [viewingImage, setViewingImage] = useState<{ url: string; format: string } | null>(null);
+  const [imageViewMode, setImageViewMode] = useState<'fit' | 'fill' | 'original'>('fit');
   const [settings, setSettings] = useState({
     privacy: {
       profileVisibility: 'everyone',
@@ -573,6 +575,25 @@ const Index = () => {
     });
   };
 
+  const handleOpenImage = (url: string) => {
+    const format = url.split('.').pop()?.toLowerCase() || 'jpg';
+    setViewingImage({ url, format });
+    setImageViewMode('fit');
+  };
+
+  const getImageViewStyle = () => {
+    switch (imageViewMode) {
+      case 'fit':
+        return 'object-contain max-h-[80vh]';
+      case 'fill':
+        return 'object-cover w-full h-[80vh]';
+      case 'original':
+        return 'object-none';
+      default:
+        return 'object-contain max-h-[80vh]';
+    }
+  };
+
   const navItems = [
     { id: 'feed' as View, icon: 'Home', label: 'Лента', color: 'bg-[#0078D7]' },
     { id: 'profile' as View, icon: 'User', label: 'Профиль', color: 'bg-[#00BCF2]' },
@@ -844,7 +865,12 @@ const Index = () => {
                       <p className={`mb-4 ${textColor}`}>{renderTextWithLinks(post.content)}</p>
                       
                       {post.image && (
-                        <img src={post.image} alt="Post" className="w-full mb-4 border-2 border-gray-200" />
+                        <img 
+                          src={post.image} 
+                          alt="Post" 
+                          className="w-full mb-4 border-2 border-gray-200 cursor-pointer hover:opacity-90 transition-opacity" 
+                          onClick={() => handleOpenImage(post.image!)}
+                        />
                       )}
                       
                       {post.video && (
@@ -1257,7 +1283,12 @@ const Index = () => {
                               {msg.media && (
                                 <div className="mb-2">
                                   {msg.mediaType === 'image' ? (
-                                    <img src={msg.media} alt="Attachment" className="max-w-full" />
+                                    <img 
+                                      src={msg.media} 
+                                      alt="Attachment" 
+                                      className="max-w-full cursor-pointer hover:opacity-90 transition-opacity" 
+                                      onClick={() => handleOpenImage(msg.media!)}
+                                    />
                                   ) : msg.mediaType === 'video' ? (
                                     <video controls className="max-w-full">
                                       <source src={msg.media} />
@@ -1908,7 +1939,12 @@ const Index = () => {
                           </div>
                           <p className={`mb-4 ${textColor}`}>{renderTextWithLinks(post.content)}</p>
                           {post.image && (
-                            <img src={post.image} alt="Post" className="w-full mb-4 border-2 border-gray-200" />
+                            <img 
+                              src={post.image} 
+                              alt="Post" 
+                              className="w-full mb-4 border-2 border-gray-200 cursor-pointer hover:opacity-90 transition-opacity" 
+                              onClick={() => handleOpenImage(post.image!)}
+                            />
                           )}
                           <div className={`flex gap-6 pt-4 border-t-2 ${borderColor}`}>
                             <Button variant="ghost" className="gap-2 text-[#0078D7] hover:bg-[#0078D7]/10 rounded-none">
@@ -1927,6 +1963,98 @@ const Index = () => {
                 )}
               </div>
             </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewingImage} onOpenChange={() => setViewingImage(null)}>
+        <DialogContent className="rounded-none max-w-[95vw] max-h-[95vh] p-0 overflow-hidden">
+          {viewingImage && (
+            <div className={`flex flex-col h-full ${isDarkMode ? 'bg-[#1E1E1E]' : 'bg-black'}`}>
+              <div className={`flex items-center justify-between p-4 ${isDarkMode ? 'bg-[#2D2D30]' : 'bg-gray-900'} border-b-2 ${borderColor}`}>
+                <div className="flex items-center gap-4">
+                  <Badge className="bg-[#0078D7] rounded-none uppercase">
+                    {viewingImage.format}
+                  </Badge>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant={imageViewMode === 'fit' ? 'default' : 'outline'}
+                      onClick={() => setImageViewMode('fit')}
+                      className="rounded-none"
+                    >
+                      <Icon name="Minimize2" size={14} className="mr-1" />
+                      Вписать
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={imageViewMode === 'fill' ? 'default' : 'outline'}
+                      onClick={() => setImageViewMode('fill')}
+                      className="rounded-none"
+                    >
+                      <Icon name="Maximize2" size={14} className="mr-1" />
+                      Заполнить
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={imageViewMode === 'original' ? 'default' : 'outline'}
+                      onClick={() => setImageViewMode('original')}
+                      className="rounded-none"
+                    >
+                      <Icon name="Image" size={14} className="mr-1" />
+                      Оригинал
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = viewingImage.url;
+                      link.download = `photo.${viewingImage.format}`;
+                      link.click();
+                      toast({ title: 'Фото загружается' });
+                    }}
+                    className="rounded-none text-white border-white hover:bg-white/10"
+                  >
+                    <Icon name="Download" size={14} className="mr-1" />
+                    Скачать
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setViewingImage(null)}
+                    className="rounded-none text-white hover:bg-white/10"
+                  >
+                    <Icon name="X" size={16} />
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="flex-1 flex items-center justify-center overflow-auto p-4">
+                <img
+                  src={viewingImage.url}
+                  alt="Просмотр фото"
+                  className={getImageViewStyle()}
+                  style={imageViewMode === 'original' ? { maxWidth: 'none' } : {}}
+                />
+              </div>
+
+              <div className={`p-3 ${isDarkMode ? 'bg-[#2D2D30]' : 'bg-gray-900'} border-t-2 ${borderColor}`}>
+                <div className="flex items-center justify-center gap-6 text-white text-sm">
+                  <div className="flex items-center gap-2">
+                    <Icon name="ZoomIn" size={16} className="text-[#0078D7]" />
+                    <span>Прокрутите для увеличения</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Icon name="Move" size={16} className="text-[#7FBA00]" />
+                    <span>Перетаскивание для перемещения</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
