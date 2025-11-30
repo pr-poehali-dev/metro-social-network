@@ -38,6 +38,9 @@ interface Post {
   likes: number;
   comments: Comment[];
   time: string;
+  shares?: number;
+  isRepost?: boolean;
+  originalAuthor?: string;
 }
 
 interface Friend {
@@ -99,12 +102,14 @@ const Index = () => {
   const [videoQuality, setVideoQuality] = useState('720p');
   const [expandedComments, setExpandedComments] = useState<Record<number, boolean>>({});
   const [commentText, setCommentText] = useState<Record<number, string>>({});
-  const [replyingTo, setReplyingTo] = useState<{ postId: number; commentId: number } | null>(null);
+
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState([70]);
   const [likedComments, setLikedComments] = useState<Set<number>>(new Set());
   const [likedPosts, setLikedPosts] = useState<Set<number>>(new Set());
+  const [replyingTo, setReplyingTo] = useState<{ postId: number; commentId: number; author: string } | null>(null);
+  const [replyText, setReplyText] = useState('');
   const [profileEdit, setProfileEdit] = useState({ 
     name: 'Вася Иванов', 
     bio: 'Люблю создавать красивые и функциональные веб-приложения. В свободное время увлекаюсь фотографией и путешествиями.', 
@@ -119,6 +124,7 @@ const Index = () => {
       content: 'Отличная погода сегодня! Провела весь день в парке 🌳',
       image: 'https://images.unsplash.com/photo-1541963463532-d68292c34b19?w=800',
       likes: 24,
+      shares: 3,
       comments: [
         { id: 101, author: 'Дмитрий', avatar: 'Д', content: 'Красиво! Где это?', likes: 3, time: '1 час назад', replies: [] },
         { id: 102, author: 'Мария', avatar: 'М', content: 'Согласна, погода шикарная!', likes: 5, time: '30 мин назад', replies: [] }
@@ -132,6 +138,7 @@ const Index = () => {
       content: 'Запустил новый проект! Долго работал над этим, наконец-то готово 🚀',
       video: 'https://www.w3schools.com/html/mov_bbb.mp4',
       likes: 56,
+      shares: 12,
       comments: [
         { id: 201, author: 'Елена', avatar: 'Е', content: 'Поздравляю! Молодец!', likes: 8, time: '2 часа назад', replies: [] }
       ],
@@ -234,6 +241,80 @@ const Index = () => {
     
     setCommentText(prev => ({ ...prev, [postId]: '' }));
     toast({ title: 'Комментарий добавлен' });
+  };
+
+  const handleReplyToComment = (postId: number, commentId: number) => {
+    if (!replyText.trim()) return;
+
+    const addReplyToComment = (comments: Comment[]): Comment[] => {
+      return comments.map(comment => {
+        if (comment.id === commentId) {
+          const newReply: Comment = {
+            id: Date.now(),
+            author: currentUser.name,
+            avatar: currentUser.avatar,
+            content: replyText,
+            likes: 0,
+            time: 'Только что',
+            replies: []
+          };
+          return { ...comment, replies: [...comment.replies, newReply] };
+        }
+        if (comment.replies.length > 0) {
+          return { ...comment, replies: addReplyToComment(comment.replies) };
+        }
+        return comment;
+      });
+    };
+
+    setPosts(posts.map(post => {
+      if (post.id === postId) {
+        return { ...post, comments: addReplyToComment(post.comments) };
+      }
+      return post;
+    }));
+
+    setReplyText('');
+    setReplyingTo(null);
+    toast({ title: 'Ответ добавлен' });
+  };
+
+  const handleSharePost = (post: Post) => {
+    const repostedPost: Post = {
+      ...post,
+      id: Date.now(),
+      isRepost: true,
+      originalAuthor: post.author,
+      author: currentUser.name,
+      avatar: currentUser.avatar,
+      time: 'Только что',
+      shares: 0,
+      comments: []
+    };
+    setPosts([repostedPost, ...posts]);
+    toast({ title: 'Пост опубликован на вашей странице' });
+  };
+
+  const renderTextWithLinks = (text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    
+    return parts.map((part, index) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#0078D7] hover:underline font-medium"
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
   };
 
   const handleLikeComment = (commentId: number) => {
@@ -408,7 +489,7 @@ const Index = () => {
                   <span className={`font-semibold text-sm ${textColor}`}>{comment.author}</span>
                   <span className="text-xs text-gray-500">{comment.time}</span>
                 </div>
-                <p className={`text-sm ${textColor} mb-2`}>{comment.content}</p>
+                <p className={`text-sm ${textColor} mb-2`}>{renderTextWithLinks(comment.content)}</p>
                 <div className="flex gap-3">
                   <Button 
                     variant="ghost" 
@@ -422,7 +503,7 @@ const Index = () => {
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    onClick={() => setReplyingTo({ postId, commentId: comment.id })}
+                    onClick={() => setReplyingTo({ postId, commentId: comment.id, author: comment.author })}
                     className="h-6 px-2 text-xs text-gray-500 hover:text-[#0078D7]"
                   >
                     Ответить
@@ -541,6 +622,12 @@ const Index = () => {
                   
                   return (
                     <Card key={post.id} className={`p-6 rounded-none border-2 ${borderColor} ${cardBg}`}>
+                      {post.isRepost && (
+                        <div className="flex items-center gap-2 mb-3 text-gray-500 text-sm">
+                          <Icon name="Repeat2" size={16} />
+                          <span>{post.author} поделился постом</span>
+                        </div>
+                      )}
                       <div className="flex gap-3 mb-4">
                         <Avatar className="h-12 w-12 rounded-none">
                           <AvatarFallback className="bg-[#00BCF2] text-white rounded-none font-bold">
@@ -548,11 +635,13 @@ const Index = () => {
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
-                          <div className={`font-semibold ${textColor}`}>{post.author}</div>
+                          <div className={`font-semibold ${textColor}`}>
+                            {post.isRepost && post.originalAuthor ? post.originalAuthor : post.author}
+                          </div>
                           <div className="text-sm text-gray-500">{post.time}</div>
                         </div>
                       </div>
-                      <p className={`mb-4 ${textColor}`}>{post.content}</p>
+                      <p className={`mb-4 ${textColor}`}>{renderTextWithLinks(post.content)}</p>
                       
                       {post.image && (
                         <img src={post.image} alt="Post" className="w-full mb-4 border-2 border-gray-200" />
@@ -595,37 +684,83 @@ const Index = () => {
                           <Icon name="MessageCircle" size={18} />
                           <span className="font-semibold">{post.comments.length}</span>
                         </Button>
-                        <Button variant="ghost" className="gap-2 text-[#0078D7] hover:bg-[#0078D7]/10 rounded-none">
+                        <Button 
+                          variant="ghost" 
+                          onClick={() => handleSharePost(post)}
+                          className="gap-2 text-[#0078D7] hover:bg-[#0078D7]/10 rounded-none"
+                        >
                           <Icon name="Share2" size={18} />
-                          Поделиться
+                          <span className="font-semibold">{post.shares || 0}</span>
                         </Button>
                       </div>
 
                       {expandedComments[post.id] && (
                         <div className={`mt-4 pt-4 border-t ${borderColor}`}>
-                          <div className="flex gap-2 mb-4">
-                            <Avatar className="h-8 w-8 rounded-none">
-                              <AvatarFallback className="bg-[#0078D7] text-white rounded-none text-xs">
-                                {currentUser.avatar}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 flex gap-2">
-                              <Input
-                                placeholder="Написать комментарий..."
-                                value={commentText[post.id] || ''}
-                                onChange={(e) => setCommentText(prev => ({ ...prev, [post.id]: e.target.value }))}
-                                onKeyDown={(e) => e.key === 'Enter' && handleAddComment(post.id)}
-                                className="rounded-none border-2"
-                              />
-                              <Button 
-                                onClick={() => handleAddComment(post.id)}
-                                size="sm" 
-                                className="bg-[#0078D7] hover:bg-[#005a9e] rounded-none"
-                              >
-                                <Icon name="Send" size={16} />
-                              </Button>
+                          {!replyingTo && (
+                            <div className="flex gap-2 mb-4">
+                              <Avatar className="h-8 w-8 rounded-none">
+                                <AvatarFallback className="bg-[#0078D7] text-white rounded-none text-xs">
+                                  {currentUser.avatar}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 flex gap-2">
+                                <Input
+                                  placeholder="Написать комментарий..."
+                                  value={commentText[post.id] || ''}
+                                  onChange={(e) => setCommentText(prev => ({ ...prev, [post.id]: e.target.value }))}
+                                  onKeyDown={(e) => e.key === 'Enter' && handleAddComment(post.id)}
+                                  className="rounded-none border-2"
+                                />
+                                <Button 
+                                  onClick={() => handleAddComment(post.id)}
+                                  size="sm" 
+                                  className="bg-[#0078D7] hover:bg-[#005a9e] rounded-none"
+                                >
+                                  <Icon name="Send" size={16} />
+                                </Button>
+                              </div>
                             </div>
-                          </div>
+                          )}
+
+                          {replyingTo && replyingTo.postId === post.id && (
+                            <div className="flex gap-2 mb-4 bg-[#0078D7]/5 p-3 rounded">
+                              <Avatar className="h-8 w-8 rounded-none">
+                                <AvatarFallback className="bg-[#0078D7] text-white rounded-none text-xs">
+                                  {currentUser.avatar}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-gray-500">Ответ для <span className="font-semibold text-[#0078D7]">{replyingTo.author}</span></span>
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    onClick={() => setReplyingTo(null)}
+                                    className="h-6 w-6 p-0"
+                                  >
+                                    <Icon name="X" size={14} />
+                                  </Button>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Input
+                                    placeholder={`Ответить ${replyingTo.author}...`}
+                                    value={replyText}
+                                    onChange={(e) => setReplyText(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleReplyToComment(post.id, replyingTo.commentId)}
+                                    className="rounded-none border-2"
+                                    autoFocus
+                                  />
+                                  <Button 
+                                    onClick={() => handleReplyToComment(post.id, replyingTo.commentId)}
+                                    size="sm" 
+                                    className="bg-[#0078D7] hover:bg-[#005a9e] rounded-none"
+                                  >
+                                    <Icon name="Send" size={16} />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                           
                           {post.comments.length > 0 && (
                             <div className="space-y-2">
@@ -824,7 +959,7 @@ const Index = () => {
                             <div className="absolute bottom-0 right-0 w-6 h-6 bg-[#7FBA00] border-2 border-white"></div>
                           )}
                         </div>
-                        <h3 className={`font-semibold mb-2 ${textColor}`}>{friend.name}</h3>
+                        <h3 className={`font-semibold mb-2 ${textColor} truncate w-full`}>{friend.name}</h3>
                         <Badge className={`${friend.status === 'online' ? 'bg-[#7FBA00]' : 'bg-gray-400'} rounded-none`}>
                           {friend.status === 'online' ? 'В сети' : 'Не в сети'}
                         </Badge>
