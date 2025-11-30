@@ -78,14 +78,19 @@ interface Conversation {
   time: string;
   unread: number;
   messages: ChatMessage[];
+  isGroup?: boolean;
+  members?: number[];
 }
 
 interface Notification {
   id: number;
   type: 'like' | 'comment' | 'friend';
   user: string;
+  userId?: number;
   content: string;
   time: string;
+  postId?: number;
+  read: boolean;
 }
 
 interface SearchUser {
@@ -140,6 +145,15 @@ const Index = () => {
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
   const [friendStatusFilter, setFriendStatusFilter] = useState<'all' | 'online' | 'offline'>('all');
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [selectedGroupMembers, setSelectedGroupMembers] = useState<number[]>([]);
+  const [currentTrackTime, setCurrentTrackTime] = useState(0);
+  const [trackDuration, setTrackDuration] = useState(0);
+  const [newTrackTitle, setNewTrackTitle] = useState('');
+  const [newTrackArtist, setNewTrackArtist] = useState('');
+  const [newTrackFile, setNewTrackFile] = useState<File | null>(null);
+  const [newTrackCover, setNewTrackCover] = useState<File | null>(null);
   const [friendsList, setFriendsList] = useState<Friend[]>([
     { id: 1, name: 'Анна Петрова', avatar: 'АП', status: 'online' },
     { id: 2, name: 'Дмитрий Иванов', avatar: 'ДИ', status: 'online' },
@@ -184,6 +198,12 @@ const Index = () => {
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState([70]);
+  const [notifications, setNotifications] = useState<Notification[]>([
+    { id: 1, type: 'like', user: 'Анна Петрова', userId: 1, content: 'понравился ваш пост', time: '5 минут назад', read: false },
+    { id: 2, type: 'comment', user: 'Дмитрий Иванов', userId: 2, content: 'прокомментировал ваш пост', time: '1 час назад', read: false },
+    { id: 3, type: 'friend', user: 'Елена Козлова', userId: 5, content: 'добавила вас в друзья', time: '3 часа назад', read: true },
+    { id: 4, type: 'like', user: 'Мария Сидорова', userId: 3, content: 'понравился ваш комментарий', time: '5 часов назад', read: true }
+  ]);
   const [likedComments, setLikedComments] = useState<Set<number>>(new Set());
   const [likedPosts, setLikedPosts] = useState<Set<number>>(new Set());
   const [replyingTo, setReplyingTo] = useState<{ postId: number; commentId: number; author: string } | null>(null);
@@ -353,6 +373,17 @@ const Index = () => {
           time: 'Только что',
           replies: []
         };
+        const newNotif: Notification = {
+          id: Date.now(),
+          type: 'comment',
+          user: currentUser.name,
+          userId: 0,
+          content: 'прокомментировал ваш пост',
+          time: 'Только что',
+          postId: postId,
+          read: false
+        };
+        setNotifications(prev => [newNotif, ...prev]);
         return { ...post, comments: [...post.comments, newComment] };
       }
       return post;
@@ -455,6 +486,16 @@ const Index = () => {
         newSet.delete(postId);
       } else {
         newSet.add(postId);
+        const newNotif: Notification = {
+          id: Date.now(),
+          type: 'like',
+          user: currentUser.name,
+          userId: 0,
+          content: 'лайкнул ваш пост',
+          time: 'Только что',
+          read: false
+        };
+        setNotifications(prev => [newNotif, ...prev]);
       }
       return newSet;
     });
@@ -512,12 +553,126 @@ const Index = () => {
     }
   ]);
 
-  const notifications: Notification[] = [
-    { id: 1, type: 'like', user: 'Анна Петрова', content: 'понравился ваш пост', time: '5 минут назад' },
-    { id: 2, type: 'comment', user: 'Дмитрий Иванов', content: 'прокомментировал ваш пост', time: '1 час назад' },
-    { id: 3, type: 'friend', user: 'Елена Козлова', content: 'добавила вас в друзья', time: '3 часа назад' },
-    { id: 4, type: 'like', user: 'Мария Сидорова', content: 'понравился ваш комментарий', time: '5 часов назад' }
-  ];
+  const handleMarkNotificationRead = (notifId: number) => {
+    setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, read: true } : n));
+  };
+
+  const handleMarkAllRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    toast({ title: 'Все уведомления прочитаны' });
+  };
+
+  const handleCreateGroup = () => {
+    if (!groupName.trim() || selectedGroupMembers.length === 0) {
+      toast({ title: 'Заполните название и добавьте участников', variant: 'destructive' });
+      return;
+    }
+    if (selectedGroupMembers.length > 50) {
+      toast({ title: 'Максимум 50 участников в группе', variant: 'destructive' });
+      return;
+    }
+    
+    const newGroup: Conversation = {
+      id: Date.now(),
+      name: groupName,
+      avatar: groupName.substring(0, 2).toUpperCase(),
+      lastMessage: 'Группа создана',
+      time: 'Сейчас',
+      unread: 0,
+      messages: [],
+      isGroup: true,
+      members: selectedGroupMembers
+    };
+    
+    setConversations(prev => [newGroup, ...prev]);
+    setIsCreateGroupOpen(false);
+    setGroupName('');
+    setSelectedGroupMembers([]);
+    toast({ title: `Группа "${groupName}" создана` });
+  };
+
+  const handleToggleGroupMember = (userId: number) => {
+    setSelectedGroupMembers(prev => {
+      if (prev.includes(userId)) {
+        return prev.filter(id => id !== userId);
+      } else {
+        if (prev.length >= 50) {
+          toast({ title: 'Максимум 50 участников', variant: 'destructive' });
+          return prev;
+        }
+        return [...prev, userId];
+      }
+    });
+  };
+
+  const handleAddTrack = () => {
+    if (!newTrackTitle.trim() || !newTrackArtist.trim()) {
+      toast({ title: 'Заполните название и исполнителя', variant: 'destructive' });
+      return;
+    }
+    
+    const newTrack: Track = {
+      id: Date.now(),
+      title: newTrackTitle,
+      artist: newTrackArtist,
+      duration: '3:30',
+      cover: newTrackCover ? URL.createObjectURL(newTrackCover) : 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300'
+    };
+    
+    setTracks(prev => [...prev, newTrack]);
+    setIsAddMusicOpen(false);
+    setNewTrackTitle('');
+    setNewTrackArtist('');
+    setNewTrackFile(null);
+    setNewTrackCover(null);
+    toast({ title: 'Трек добавлен в библиотеку' });
+  };
+
+  useEffect(() => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.play();
+      } else {
+        audioRef.current.pause();
+      }
+      audioRef.current.volume = volume[0] / 100;
+    }
+  }, [isPlaying, volume]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      const updateTime = () => setCurrentTrackTime(audio.currentTime);
+      const updateDuration = () => setTrackDuration(audio.duration);
+      const handleEnded = () => setIsPlaying(false);
+      
+      audio.addEventListener('timeupdate', updateTime);
+      audio.addEventListener('loadedmetadata', updateDuration);
+      audio.addEventListener('ended', handleEnded);
+      
+      return () => {
+        audio.removeEventListener('timeupdate', updateTime);
+        audio.removeEventListener('loadedmetadata', updateDuration);
+        audio.removeEventListener('ended', handleEnded);
+      };
+    }
+  }, [currentTrack]);
+
+  const formatTime = (seconds: number) => {
+    if (isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleSeek = (value: number[]) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = value[0];
+      setCurrentTrackTime(value[0]);
+    }
+  };
+
+  const unreadNotificationsCount = notifications.filter(n => !n.read).length;
 
   const searchUsers: SearchUser[] = [
     { id: 10, name: 'Олег Кузнецов', avatar: 'ОК', mutualFriends: 5 },
@@ -667,6 +822,16 @@ const Index = () => {
     const alreadyFriend = friendsList.some(f => f.id === userId);
     if (!alreadyFriend) {
       setFriendsList(prev => [...prev, { id: userId, name, avatar, status: 'online' }]);
+      const newNotif: Notification = {
+        id: Date.now(),
+        type: 'friend',
+        user: name,
+        userId: userId,
+        content: 'теперь ваш друг',
+        time: 'Только что',
+        read: false
+      };
+      setNotifications(prev => [newNotif, ...prev]);
     }
     setSentRequests(prev => {
       const newSet = new Set(prev);
@@ -716,7 +881,7 @@ const Index = () => {
     { id: 'friends' as View, icon: 'Users', label: 'Друзья', color: 'bg-[#7FBA00]', badge: friendRequests.length },
     { id: 'messages' as View, icon: 'MessageSquare', label: 'Сообщения', color: 'bg-[#FFB900]' },
     { id: 'music' as View, icon: 'Music', label: 'Музыка', color: 'bg-[#9b87f5]' },
-    { id: 'notifications' as View, icon: 'Bell', label: 'Уведомления', color: 'bg-[#E81123]' }
+    { id: 'notifications' as View, icon: 'Bell', label: 'Уведомления', color: 'bg-[#E81123]', badge: unreadNotificationsCount }
   ];
 
   const bgColor = isDarkMode ? 'bg-[#1A1A1A]' : 'bg-white';
@@ -1203,35 +1368,69 @@ const Index = () => {
 
               {currentTrack && (
                 <div className={`${cardBg} border-t-2 ${borderColor} p-4`}>
-                  <div className="max-w-5xl mx-auto flex items-center gap-4">
-                    <img src={currentTrack.cover} alt={currentTrack.title} className="w-16 h-16 rounded-none" />
-                    <div className="flex-1">
-                      <h4 className={`font-semibold ${textColor}`}>{currentTrack.title}</h4>
-                      <p className="text-sm text-gray-500">{currentTrack.artist}</p>
+                  <audio ref={audioRef} src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" />
+                  <div className="max-w-5xl mx-auto">
+                    <div className="flex items-center gap-4 mb-3">
+                      <img src={currentTrack.cover} alt={currentTrack.title} className="w-16 h-16 rounded-none" />
+                      <div className="flex-1 min-w-0">
+                        <h4 className={`font-semibold ${textColor} truncate`}>{currentTrack.title}</h4>
+                        <p className="text-sm text-gray-500 truncate">{currentTrack.artist}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="rounded-none"
+                          onClick={() => {
+                            const currentIndex = tracks.findIndex(t => t.id === currentTrack.id);
+                            if (currentIndex > 0) {
+                              playTrack(tracks[currentIndex - 1]);
+                            }
+                          }}
+                        >
+                          <Icon name="SkipBack" size={20} />
+                        </Button>
+                        <Button 
+                          onClick={togglePlay}
+                          className="bg-[#9b87f5] hover:bg-[#8b77e5] rounded-none h-10 w-10"
+                        >
+                          <Icon name={isPlaying ? 'Pause' : 'Play'} size={20} className="text-white" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="rounded-none"
+                          onClick={() => {
+                            const currentIndex = tracks.findIndex(t => t.id === currentTrack.id);
+                            if (currentIndex < tracks.length - 1) {
+                              playTrack(tracks[currentIndex + 1]);
+                            }
+                          }}
+                        >
+                          <Icon name="SkipForward" size={20} />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2 w-32">
+                        <Icon name="Volume2" size={18} className="text-gray-500" />
+                        <Slider 
+                          value={volume} 
+                          onValueChange={setVolume}
+                          max={100}
+                          step={1}
+                          className="w-full"
+                        />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <Button variant="ghost" size="icon" className="rounded-none">
-                        <Icon name="SkipBack" size={20} />
-                      </Button>
-                      <Button 
-                        onClick={togglePlay}
-                        className="bg-[#9b87f5] hover:bg-[#8b77e5] rounded-none h-12 w-12"
-                      >
-                        <Icon name={isPlaying ? 'Pause' : 'Play'} size={24} className="text-white" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="rounded-none">
-                        <Icon name="SkipForward" size={20} />
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-2 w-32">
-                      <Icon name="Volume2" size={18} className="text-gray-500" />
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-500 w-10">{formatTime(currentTrackTime)}</span>
                       <Slider 
-                        value={volume} 
-                        onValueChange={setVolume}
-                        max={100}
-                        step={1}
-                        className="w-full"
+                        value={[currentTrackTime]} 
+                        onValueChange={handleSeek}
+                        max={trackDuration || 100}
+                        step={0.1}
+                        className="flex-1"
                       />
+                      <span className="text-xs text-gray-500 w-10">{formatTime(trackDuration)}</span>
                     </div>
                   </div>
                 </div>
@@ -1319,9 +1518,9 @@ const Index = () => {
                       <Icon name="UserPlus" size={24} className="text-[#0078D7]" />
                       Заявки в друзья ({friendRequests.length})
                     </h3>
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
                       {friendRequests.map((request) => (
-                        <div key={request.id} className={`flex items-center gap-4 p-4 border-2 ${borderColor} rounded hover:bg-[#0078D7]/5 transition-colors`}>
+                        <Card key={request.id} className={`flex items-center gap-4 p-4 border-2 ${borderColor} rounded-none hover:bg-[#0078D7]/5 transition-colors ${cardBg}`}>
                           <Avatar 
                             className="h-16 w-16 rounded-none cursor-pointer hover:opacity-80 transition-opacity"
                             onClick={() => {
@@ -1348,10 +1547,11 @@ const Index = () => {
                             <p className="text-sm text-gray-500">{request.mutualFriends} общих друзей</p>
                             <p className="text-xs text-gray-400">{request.time}</p>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex flex-col gap-2 w-full mt-2">
                             <Button 
                               onClick={() => handleAcceptRequest(request.id, request.userId, request.name, request.avatar)}
-                              className="bg-[#7FBA00] hover:bg-[#6a9e00] rounded-none"
+                              className="bg-[#7FBA00] hover:bg-[#6a9e00] rounded-none w-full"
+                              size="sm"
                             >
                               <Icon name="Check" size={16} className="mr-2" />
                               Принять
@@ -1359,13 +1559,14 @@ const Index = () => {
                             <Button 
                               onClick={() => handleDeclineRequest(request.id, request.name)}
                               variant="outline"
-                              className="rounded-none border-2 text-[#E81123] hover:bg-[#E81123]/10"
+                              className="rounded-none border-2 text-[#E81123] hover:bg-[#E81123]/10 w-full"
+                              size="sm"
                             >
                               <Icon name="X" size={16} className="mr-2" />
                               Отклонить
                             </Button>
                           </div>
-                        </div>
+                        </Card>
                       ))}
                     </div>
                   </Card>
@@ -1496,7 +1697,15 @@ const Index = () => {
           {currentView === 'messages' && (
             <div className="flex h-full">
               <div className={`w-80 border-r-2 ${borderColor} ${isDarkMode ? 'bg-[#252526]' : 'bg-gray-50'}`}>
-                <div className={`p-4 border-b-2 ${borderColor}`}>
+                <div className={`p-4 border-b-2 ${borderColor} space-y-2`}>
+                  <Button 
+                    onClick={() => setIsCreateGroupOpen(true)}
+                    className="w-full bg-[#0078D7] hover:bg-[#005a9e] rounded-none"
+                    size="sm"
+                  >
+                    <Icon name="Users" size={16} className="mr-2" />
+                    Создать группу
+                  </Button>
                   <Input placeholder="Поиск сообщений..." className="rounded-none border-2" />
                 </div>
                 <ScrollArea className="h-[calc(100%-73px)]">
@@ -1673,40 +1882,66 @@ const Index = () => {
           {currentView === 'notifications' && (
             <ScrollArea className="h-full">
               <div className="max-w-3xl mx-auto p-6">
-                <h2 className={`text-2xl font-bold mb-6 ${textColor}`}>Уведомления</h2>
-                <div className="space-y-2">
-                  {notifications.map((notif) => (
-                    <Card key={notif.id} className={`p-4 rounded-none border-2 ${borderColor} hover:bg-gray-50/5 transition-colors ${cardBg}`}>
-                      <div className="flex items-center gap-4">
-                        <div className={`p-3 ${
-                          notif.type === 'like' ? 'bg-[#E81123]' : 
-                          notif.type === 'comment' ? 'bg-[#0078D7]' : 
-                          'bg-[#7FBA00]'
-                        }`}>
-                          <Icon 
-                            name={notif.type === 'like' ? 'Heart' : notif.type === 'comment' ? 'MessageCircle' : 'UserPlus'} 
-                            size={20} 
-                            className="text-white"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <p className={textColor}>
-                            <span 
-                              className="font-semibold cursor-pointer hover:text-[#0078D7] transition-colors"
-                              onClick={() => {
-                                const notifProfile = allUsers.find(u => u.name === notif.user);
-                                if (notifProfile) {
-                                  handleViewProfile(notifProfile.id);
-                                }
-                              }}
-                            >{notif.user}</span> {notif.content}
-                          </p>
-                          <span className="text-sm text-gray-500">{notif.time}</span>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className={`text-2xl font-bold ${textColor}`}>Уведомления</h2>
+                  {unreadNotificationsCount > 0 && (
+                    <Button 
+                      onClick={handleMarkAllRead}
+                      variant="outline"
+                      size="sm"
+                      className="rounded-none border-2"
+                    >
+                      <Icon name="Check" size={16} className="mr-2" />
+                      Отметить всё прочитанным
+                    </Button>
+                  )}
                 </div>
+                {notifications.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Icon name="Bell" size={64} className="mx-auto mb-4 text-gray-400 opacity-50" />
+                    <p className="text-gray-500 text-lg">У вас пока нет уведомлений</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {notifications.map((notif) => (
+                      <Card 
+                        key={notif.id} 
+                        className={`p-4 rounded-none border-2 ${borderColor} hover:bg-gray-50/5 transition-colors cursor-pointer ${cardBg} ${
+                          !notif.read ? 'bg-[#0078D7]/5 border-l-4 border-l-[#0078D7]' : ''
+                        }`}
+                        onClick={() => {
+                          handleMarkNotificationRead(notif.id);
+                          if (notif.userId) {
+                            handleViewProfile(notif.userId);
+                          }
+                        }}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className={`p-3 ${
+                            notif.type === 'like' ? 'bg-[#E81123]' : 
+                            notif.type === 'comment' ? 'bg-[#0078D7]' : 
+                            'bg-[#7FBA00]'
+                          }`}>
+                            <Icon 
+                              name={notif.type === 'like' ? 'Heart' : notif.type === 'comment' ? 'MessageCircle' : 'UserPlus'} 
+                              size={20} 
+                              className="text-white"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className={textColor}>
+                              <span className="font-semibold">{notif.user}</span> {notif.content}
+                            </p>
+                            <span className="text-sm text-gray-500">{notif.time}</span>
+                          </div>
+                          {!notif.read && (
+                            <div className="w-3 h-3 bg-[#0078D7] rounded-full"></div>
+                          )}
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </div>
             </ScrollArea>
           )}
@@ -1869,26 +2104,58 @@ const Index = () => {
           <div className="space-y-4">
             <div>
               <Label htmlFor="track-title">Название трека</Label>
-              <Input id="track-title" placeholder="Введите название..." className="rounded-none border-2" />
+              <Input 
+                id="track-title" 
+                placeholder="Введите название..." 
+                className="rounded-none border-2" 
+                value={newTrackTitle}
+                onChange={(e) => setNewTrackTitle(e.target.value)}
+              />
             </div>
             <div>
               <Label htmlFor="track-artist">Исполнитель</Label>
-              <Input id="track-artist" placeholder="Введите имя исполнителя..." className="rounded-none border-2" />
+              <Input 
+                id="track-artist" 
+                placeholder="Введите имя исполнителя..." 
+                className="rounded-none border-2"
+                value={newTrackArtist}
+                onChange={(e) => setNewTrackArtist(e.target.value)}
+              />
             </div>
             <div>
-              <Label htmlFor="track-file">Аудиофайл</Label>
-              <Input id="track-file" type="file" accept="audio/*" className="rounded-none border-2" />
+              <Label htmlFor="track-file">Аудиофайл (опционально)</Label>
+              <Input 
+                id="track-file" 
+                type="file" 
+                accept="audio/*" 
+                className="rounded-none border-2"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    setNewTrackFile(e.target.files[0]);
+                  }
+                }}
+              />
             </div>
             <div>
-              <Label htmlFor="track-cover">Обложка</Label>
-              <Input id="track-cover" type="file" accept="image/*" className="rounded-none border-2" />
+              <Label htmlFor="track-cover">Обложка (опционально)</Label>
+              <Input 
+                id="track-cover" 
+                type="file" 
+                accept="image/*" 
+                className="rounded-none border-2"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    setNewTrackCover(e.target.files[0]);
+                  }
+                }}
+              />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddMusicOpen(false)} className="rounded-none">
               Отмена
             </Button>
-            <Button onClick={() => { setIsAddMusicOpen(false); toast({ title: 'Трек добавлен в библиотеку' }); }} className="bg-[#9b87f5] hover:bg-[#8b77e5] rounded-none">
+            <Button onClick={handleAddTrack} className="bg-[#9b87f5] hover:bg-[#8b77e5] rounded-none">
               Добавить
             </Button>
           </DialogFooter>
@@ -2215,6 +2482,72 @@ const Index = () => {
             >
               <Icon name="Save" size={16} className="mr-2" />
               Сохранить изменения
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCreateGroupOpen} onOpenChange={setIsCreateGroupOpen}>
+        <DialogContent className="rounded-none max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Создать групповой чат</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="group-name">Название группы</Label>
+              <Input 
+                id="group-name" 
+                placeholder="Введите название..." 
+                className="rounded-none border-2"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Участники ({selectedGroupMembers.length}/50)</Label>
+              <ScrollArea className="h-[300px] mt-2 border-2 rounded-none p-2">
+                <div className="space-y-2">
+                  {friendsList.map((friend) => (
+                    <Card 
+                      key={friend.id}
+                      className={`p-3 rounded-none border-2 cursor-pointer transition-colors ${
+                        selectedGroupMembers.includes(friend.id) 
+                          ? 'bg-[#0078D7]/10 border-[#0078D7]' 
+                          : 'hover:bg-gray-50/5'
+                      }`}
+                      onClick={() => handleToggleGroupMember(friend.id)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10 rounded-none">
+                          <AvatarFallback className="bg-[#00BCF2] text-white rounded-none font-bold">
+                            {friend.avatar}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className={textColor}>{friend.name}</div>
+                          <div className="text-xs text-gray-500">{friend.status === 'online' ? 'В сети' : 'Не в сети'}</div>
+                        </div>
+                        {selectedGroupMembers.includes(friend.id) && (
+                          <Icon name="Check" size={20} className="text-[#0078D7]" />
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateGroupOpen(false)} className="rounded-none">
+              Отмена
+            </Button>
+            <Button 
+              onClick={handleCreateGroup}
+              className="bg-[#0078D7] hover:bg-[#005a9e] rounded-none"
+              disabled={!groupName.trim() || selectedGroupMembers.length === 0}
+            >
+              <Icon name="Users" size={16} className="mr-2" />
+              Создать группу
             </Button>
           </DialogFooter>
         </DialogContent>
