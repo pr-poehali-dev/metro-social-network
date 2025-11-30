@@ -295,6 +295,24 @@ const Index = () => {
     toast({ title: 'Сообщение отправлено' });
   };
 
+  const handleStartChat = (userId: number, userName: string, userAvatar: string) => {
+    const existingConv = conversations.find(c => c.id === userId);
+    if (!existingConv) {
+      const newConversation: Conversation = {
+        id: userId,
+        name: userName,
+        avatar: userAvatar,
+        lastMessage: '',
+        time: 'Сейчас',
+        unread: 0,
+        messages: []
+      };
+      setConversations(prev => [newConversation, ...prev]);
+    }
+    setSelectedChat(userId);
+    setCurrentView('messages');
+  };
+
   const handlePublishPost = () => {
     if (newPost.trim() || mediaFile) {
       toast({ title: 'Пост опубликован' });
@@ -1358,10 +1376,11 @@ const Index = () => {
                             )}
                           </div>
                           <h3 
-                            className={`font-semibold mb-2 ${textColor} truncate w-full cursor-pointer hover:text-[#0078D7] transition-colors`}
+                            className={`font-semibold mb-1 ${textColor} truncate w-full cursor-pointer hover:text-[#0078D7] transition-colors`}
                             onClick={() => friendProfile && handleViewProfile(friendProfile.id)}
                           >{friend.name}</h3>
-                          <Badge className={`${friend.status === 'online' ? 'bg-[#7FBA00]' : 'bg-gray-400'} rounded-none`}>
+                          <p className="text-xs text-gray-500 mb-2">{friendProfile?.friends || 0} друзей</p>
+                          <Badge className={`${friend.status === 'online' ? 'bg-[#7FBA00]' : 'bg-gray-400'} rounded-none mb-1`}>
                             {friend.status === 'online' ? 'В сети' : 'Не в сети'}
                           </Badge>
                           <div className="flex gap-2 mt-4 w-full">
@@ -1369,10 +1388,7 @@ const Index = () => {
                               variant="outline" 
                               size="sm" 
                               className="flex-1 rounded-none border-2"
-                              onClick={() => {
-                                setCurrentView('messages');
-                                setSelectedChat(friend.id);
-                              }}
+                              onClick={() => handleStartChat(friend.id, friend.name, friend.avatar)}
                             >
                               <Icon name="MessageSquare" size={14} />
                             </Button>
@@ -1671,32 +1687,51 @@ const Index = () => {
                   >
                     <h4 className="font-semibold">{user.name}</h4>
                     <p className="text-sm text-gray-500">{user.work}</p>
+                    <p className="text-xs text-gray-400 mt-1">{user.friends} друзей</p>
                   </div>
-                  {friendsList.some(f => f.id === user.id) ? (
+                  <div className="flex flex-col gap-2">
                     <Button 
-                      className="bg-[#7FBA00] hover:bg-[#6a9e00] rounded-none"
-                      disabled
+                      onClick={() => {
+                        handleStartChat(user.id, user.name, user.avatar);
+                        setIsFindFriendsOpen(false);
+                        setFriendSearchQuery('');
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="rounded-none border-2"
                     >
-                      <Icon name="UserCheck" size={16} className="mr-2" />
-                      В друзьях
+                      <Icon name="MessageSquare" size={14} className="mr-2" />
+                      Написать
                     </Button>
-                  ) : sentRequests.has(user.id) ? (
-                    <Button 
-                      className="bg-gray-500 hover:bg-gray-600 rounded-none"
-                      disabled
-                    >
-                      <Icon name="Clock" size={16} className="mr-2" />
-                      Отправлена
-                    </Button>
-                  ) : (
-                    <Button 
-                      onClick={() => handleSendFriendRequest(user.id, user.name)} 
-                      className="bg-[#0078D7] hover:bg-[#005a9e] rounded-none"
-                    >
-                      <Icon name="UserPlus" size={16} className="mr-2" />
-                      Добавить
-                    </Button>
-                  )}
+                    {friendsList.some(f => f.id === user.id) ? (
+                      <Button 
+                        className="bg-[#7FBA00] hover:bg-[#6a9e00] rounded-none"
+                        size="sm"
+                        disabled
+                      >
+                        <Icon name="UserCheck" size={14} className="mr-2" />
+                        В друзьях
+                      </Button>
+                    ) : sentRequests.has(user.id) ? (
+                      <Button 
+                        className="bg-gray-500 hover:bg-gray-600 rounded-none"
+                        size="sm"
+                        disabled
+                      >
+                        <Icon name="Clock" size={14} className="mr-2" />
+                        Отправлена
+                      </Button>
+                    ) : (
+                      <Button 
+                        onClick={() => handleSendFriendRequest(user.id, user.name)} 
+                        className="bg-[#0078D7] hover:bg-[#005a9e] rounded-none"
+                        size="sm"
+                      >
+                        <Icon name="UserPlus" size={14} className="mr-2" />
+                        Добавить
+                      </Button>
+                    )}
+                  </div>
                 </Card>
               ))}
             </div>
@@ -2114,8 +2149,8 @@ const Index = () => {
                           variant="outline" 
                           className="rounded-none border-2"
                           onClick={() => {
+                            handleStartChat(viewingProfile.id, viewingProfile.name, viewingProfile.avatar);
                             setViewingProfile(null);
-                            setCurrentView('messages');
                           }}
                         >
                           <Icon name="MessageSquare" size={16} className="mr-2" />
