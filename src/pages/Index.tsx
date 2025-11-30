@@ -1137,13 +1137,13 @@ const Index = () => {
                       <div className="space-y-4">
                         {conversations.find((c) => c.id === selectedChat)?.messages.map((msg) => (
                           <div key={msg.id} className={`flex ${msg.senderId === 0 ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-md ${msg.senderId === 0 ? 'bg-[#0078D7] text-white' : `${cardBg} border-2 ${borderColor}`} p-3 rounded`}>
+                            <div className={`max-w-md ${msg.senderId === 0 ? 'bg-[#0078D7] text-white' : `${cardBg} border-2 ${borderColor}`} p-3`}>
                               {msg.media && (
                                 <div className="mb-2">
                                   {msg.mediaType === 'image' ? (
-                                    <img src={msg.media} alt="Attachment" className="max-w-full rounded" />
+                                    <img src={msg.media} alt="Attachment" className="max-w-full" />
                                   ) : msg.mediaType === 'video' ? (
-                                    <video controls className="max-w-full rounded">
+                                    <video controls className="max-w-full">
                                       <source src={msg.media} />
                                     </video>
                                   ) : null}
