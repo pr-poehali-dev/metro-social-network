@@ -86,6 +86,20 @@ interface SearchUser {
   mutualFriends: number;
 }
 
+interface UserProfile {
+  id: number;
+  name: string;
+  avatar: string;
+  bio: string;
+  location: string;
+  work: string;
+  friends: number;
+  photos: number;
+  followers: number;
+  status: 'online' | 'offline';
+  posts: Post[];
+}
+
 interface Track {
   id: number;
   title: string;
@@ -109,6 +123,8 @@ const Index = () => {
   const [isFindFriendsOpen, setIsFindFriendsOpen] = useState(false);
   const [isAddMusicOpen, setIsAddMusicOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [viewingProfile, setViewingProfile] = useState<UserProfile | null>(null);
+  const [subscribedUsers, setSubscribedUsers] = useState<Set<number>>(new Set());
   const [settings, setSettings] = useState({
     privacy: {
       profileVisibility: 'everyone',
@@ -473,6 +489,90 @@ const Index = () => {
     { id: 13, name: 'Наталья Соколова', avatar: 'НС', mutualFriends: 8 }
   ];
 
+  const userProfiles: UserProfile[] = [
+    {
+      id: 1,
+      name: 'Анна Петрова',
+      avatar: 'АП',
+      bio: 'Фотограф и путешественник. Люблю природу и новые места.',
+      location: 'Санкт-Петербург, Россия',
+      work: 'Фрилансер',
+      friends: 342,
+      photos: 215,
+      followers: 128,
+      status: 'online',
+      posts: [
+        {
+          id: 101,
+          author: 'Анна Петрова',
+          avatar: 'АП',
+          content: 'Новая фотосессия на закате! 🌅',
+          image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800',
+          likes: 42,
+          comments: [],
+          time: '1 день назад'
+        }
+      ]
+    },
+    {
+      id: 2,
+      name: 'Дмитрий Иванов',
+      avatar: 'ДИ',
+      bio: 'Разработчик и предприниматель. Создаю инновационные продукты.',
+      location: 'Москва, Россия',
+      work: 'Tech Startup',
+      friends: 567,
+      photos: 89,
+      followers: 234,
+      status: 'online',
+      posts: [
+        {
+          id: 201,
+          author: 'Дмитрий Иванов',
+          avatar: 'ДИ',
+          content: 'Работа над новым проектом продолжается! 💻',
+          likes: 67,
+          comments: [],
+          time: '3 часа назад'
+        }
+      ]
+    },
+    {
+      id: 3,
+      name: 'Мария Сидорова',
+      avatar: 'МС',
+      bio: 'Дизайнер интерфейсов. Создаю красивые и удобные решения.',
+      location: 'Казань, Россия',
+      work: 'Design Agency',
+      friends: 189,
+      photos: 156,
+      followers: 95,
+      status: 'offline',
+      posts: []
+    }
+  ];
+
+  const handleViewProfile = (userId: number) => {
+    const profile = userProfiles.find(u => u.id === userId);
+    if (profile) {
+      setViewingProfile(profile);
+    }
+  };
+
+  const handleSubscribe = (userId: number) => {
+    setSubscribedUsers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+        toast({ title: 'Вы отписались' });
+      } else {
+        newSet.add(userId);
+        toast({ title: 'Вы подписались на пользователя' });
+      }
+      return newSet;
+    });
+  };
+
   const navItems = [
     { id: 'feed' as View, icon: 'Home', label: 'Лента', color: 'bg-[#0078D7]' },
     { id: 'profile' as View, icon: 'User', label: 'Профиль', color: 'bg-[#00BCF2]' },
@@ -712,6 +812,7 @@ const Index = () => {
                 {posts.map((post) => {
                   const isPostLiked = likedPosts.has(post.id);
                   const displayPostLikes = post.likes + (isPostLiked ? 1 : 0);
+                  const postAuthorProfile = userProfiles.find(u => u.name === post.author);
                   
                   return (
                     <Card key={post.id} className={`p-6 rounded-none border-2 ${borderColor} ${cardBg}`}>
@@ -722,13 +823,19 @@ const Index = () => {
                         </div>
                       )}
                       <div className="flex gap-3 mb-4">
-                        <Avatar className="h-12 w-12 rounded-none">
+                        <Avatar 
+                          className="h-12 w-12 rounded-none cursor-pointer hover:opacity-80 transition-opacity" 
+                          onClick={() => postAuthorProfile && handleViewProfile(postAuthorProfile.id)}
+                        >
                           <AvatarFallback className="bg-[#00BCF2] text-white rounded-none font-bold">
                             {post.avatar}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
-                          <div className={`font-semibold ${textColor}`}>
+                          <div 
+                            className={`font-semibold ${textColor} cursor-pointer hover:text-[#0078D7] transition-colors`}
+                            onClick={() => postAuthorProfile && handleViewProfile(postAuthorProfile.id)}
+                          >
                             {post.isRepost && post.originalAuthor ? post.originalAuthor : post.author}
                           </div>
                           <div className="text-sm text-gray-500">{post.time}</div>
@@ -1040,11 +1147,16 @@ const Index = () => {
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
-                  {friends.map((friend) => (
+                  {friends.map((friend) => {
+                    const friendProfile = userProfiles.find(u => u.name === friend.name);
+                    return (
                     <Card key={friend.id} className={`p-6 rounded-none border-2 ${borderColor} ${cardBg}`}>
                       <div className="flex flex-col items-center text-center">
                         <div className="relative mb-3">
-                          <Avatar className="h-24 w-24 rounded-none">
+                          <Avatar 
+                            className="h-24 w-24 rounded-none cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => friendProfile && handleViewProfile(friendProfile.id)}
+                          >
                             <AvatarFallback className="bg-[#00BCF2] text-white rounded-none text-2xl font-bold">
                               {friend.avatar}
                             </AvatarFallback>
@@ -1053,7 +1165,10 @@ const Index = () => {
                             <div className="absolute bottom-0 right-0 w-6 h-6 bg-[#7FBA00] border-2 border-white"></div>
                           )}
                         </div>
-                        <h3 className={`font-semibold mb-2 ${textColor} truncate w-full`}>{friend.name}</h3>
+                        <h3 
+                          className={`font-semibold mb-2 ${textColor} truncate w-full cursor-pointer hover:text-[#0078D7] transition-colors`}
+                          onClick={() => friendProfile && handleViewProfile(friendProfile.id)}
+                        >{friend.name}</h3>
                         <Badge className={`${friend.status === 'online' ? 'bg-[#7FBA00]' : 'bg-gray-400'} rounded-none`}>
                           {friend.status === 'online' ? 'В сети' : 'Не в сети'}
                         </Badge>
@@ -1067,7 +1182,8 @@ const Index = () => {
                         </div>
                       </div>
                     </Card>
-                  ))}
+                  );
+                  })}
                 </div>
               </div>
             </ScrollArea>
@@ -1690,6 +1806,128 @@ const Index = () => {
               Сохранить изменения
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewingProfile} onOpenChange={() => setViewingProfile(null)}>
+        <DialogContent className="rounded-none max-w-5xl max-h-[90vh] overflow-y-auto">
+          {viewingProfile && (
+            <>
+              <div className="h-48 bg-gradient-to-r from-[#0078D7] to-[#00BCF2] -m-6 mb-0"></div>
+              <div className="p-6 pt-0">
+                <div className="flex gap-6 -mt-20 mb-6">
+                  <Avatar className="h-32 w-32 rounded-none border-4 border-white">
+                    <AvatarFallback className="bg-[#0078D7] text-white rounded-none text-4xl font-bold">
+                      {viewingProfile.avatar}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="mt-16 flex-1">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h2 className={`text-3xl font-bold mb-1 ${textColor}`}>{viewingProfile.name}</h2>
+                        <p className="text-gray-600 mb-2">{viewingProfile.work}</p>
+                        {viewingProfile.status === 'online' && (
+                          <Badge className="bg-[#7FBA00] rounded-none">В сети</Badge>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          onClick={() => handleSubscribe(viewingProfile.id)}
+                          className={`${subscribedUsers.has(viewingProfile.id) ? 'bg-gray-500 hover:bg-gray-600' : 'bg-[#0078D7] hover:bg-[#005a9e]'} rounded-none`}
+                        >
+                          <Icon name={subscribedUsers.has(viewingProfile.id) ? 'UserCheck' : 'UserPlus'} size={16} className="mr-2" />
+                          {subscribedUsers.has(viewingProfile.id) ? 'Отписаться' : 'Подписаться'}
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          className="rounded-none border-2"
+                          onClick={() => {
+                            setViewingProfile(null);
+                            setCurrentView('messages');
+                          }}
+                        >
+                          <Icon name="MessageSquare" size={16} className="mr-2" />
+                          Написать
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <Card className="p-4 rounded-none border-2 bg-[#0078D7] text-white">
+                    <div className="text-3xl font-bold">{viewingProfile.friends}</div>
+                    <div className="text-sm opacity-90">Друзей</div>
+                  </Card>
+                  <Card className="p-4 rounded-none border-2 bg-[#7FBA00] text-white">
+                    <div className="text-3xl font-bold">{viewingProfile.photos}</div>
+                    <div className="text-sm opacity-90">Фотографий</div>
+                  </Card>
+                  <Card className="p-4 rounded-none border-2 bg-[#FFB900] text-white">
+                    <div className="text-3xl font-bold">{viewingProfile.followers + (subscribedUsers.has(viewingProfile.id) ? 1 : 0)}</div>
+                    <div className="text-sm opacity-90">Подписчиков</div>
+                  </Card>
+                </div>
+
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <h3 className={`font-bold mb-2 text-lg ${textColor}`}>О себе</h3>
+                    <p className="text-gray-700">{viewingProfile.bio}</p>
+                  </div>
+                  <div>
+                    <h3 className={`font-bold mb-2 text-lg ${textColor}`}>Информация</h3>
+                    <div className="space-y-2 text-gray-700">
+                      <div className="flex gap-2">
+                        <Icon name="MapPin" size={18} className="text-[#0078D7]" />
+                        <span>{viewingProfile.location}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Icon name="Briefcase" size={18} className="text-[#0078D7]" />
+                        <span>{viewingProfile.work}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {viewingProfile.posts.length > 0 && (
+                  <div>
+                    <h3 className={`font-bold mb-4 text-lg ${textColor}`}>Посты</h3>
+                    <div className="space-y-4">
+                      {viewingProfile.posts.map((post) => (
+                        <Card key={post.id} className={`p-6 rounded-none border-2 ${borderColor} ${cardBg}`}>
+                          <div className="flex gap-3 mb-4">
+                            <Avatar className="h-12 w-12 rounded-none">
+                              <AvatarFallback className="bg-[#00BCF2] text-white rounded-none font-bold">
+                                {post.avatar}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <div className={`font-semibold ${textColor}`}>{post.author}</div>
+                              <div className="text-sm text-gray-500">{post.time}</div>
+                            </div>
+                          </div>
+                          <p className={`mb-4 ${textColor}`}>{renderTextWithLinks(post.content)}</p>
+                          {post.image && (
+                            <img src={post.image} alt="Post" className="w-full mb-4 border-2 border-gray-200" />
+                          )}
+                          <div className={`flex gap-6 pt-4 border-t-2 ${borderColor}`}>
+                            <Button variant="ghost" className="gap-2 text-[#0078D7] hover:bg-[#0078D7]/10 rounded-none">
+                              <Icon name="Heart" size={18} />
+                              <span className="font-semibold">{post.likes}</span>
+                            </Button>
+                            <Button variant="ghost" className="gap-2 text-[#0078D7] hover:bg-[#0078D7]/10 rounded-none">
+                              <Icon name="MessageCircle" size={18} />
+                              <span className="font-semibold">{post.comments.length}</span>
+                            </Button>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
