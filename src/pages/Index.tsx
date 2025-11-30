@@ -50,13 +50,25 @@ interface Friend {
   status: 'online' | 'offline';
 }
 
-interface Message {
+interface ChatMessage {
+  id: number;
+  senderId: number;
+  senderName: string;
+  senderAvatar: string;
+  text: string;
+  time: string;
+  media?: string;
+  mediaType?: 'image' | 'video';
+}
+
+interface Conversation {
   id: number;
   name: string;
   avatar: string;
   lastMessage: string;
   time: string;
   unread: number;
+  messages: ChatMessage[];
 }
 
 interface Notification {
@@ -118,6 +130,7 @@ const Index = () => {
     }
   });
   const [newMessage, setNewMessage] = useState('');
+  const [messageMediaFile, setMessageMediaFile] = useState<File | null>(null);
   const [newPost, setNewPost] = useState('');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [videoQuality, setVideoQuality] = useState('720p');
@@ -210,11 +223,34 @@ const Index = () => {
   };
 
   const handleSendMessage = () => {
-    if (newMessage.trim() || mediaFile) {
-      toast({ title: 'Сообщение отправлено' });
-      setNewMessage('');
-      setMediaFile(null);
-    }
+    if (!selectedChat || (!newMessage.trim() && !messageMediaFile)) return;
+
+    const newMsg: ChatMessage = {
+      id: Date.now(),
+      senderId: 0,
+      senderName: currentUser.name,
+      senderAvatar: currentUser.avatar,
+      text: newMessage.trim(),
+      time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+      media: messageMediaFile ? URL.createObjectURL(messageMediaFile) : undefined,
+      mediaType: messageMediaFile?.type.startsWith('image/') ? 'image' : messageMediaFile?.type.startsWith('video/') ? 'video' : undefined
+    };
+
+    setConversations(conversations.map(conv => {
+      if (conv.id === selectedChat) {
+        return {
+          ...conv,
+          messages: [...conv.messages, newMsg],
+          lastMessage: newMessage.trim() || 'Медиафайл',
+          time: newMsg.time
+        };
+      }
+      return conv;
+    }));
+
+    setNewMessage('');
+    setMessageMediaFile(null);
+    toast({ title: 'Сообщение отправлено' });
   };
 
   const handlePublishPost = () => {
@@ -381,11 +417,47 @@ const Index = () => {
     { id: 6, name: 'Сергей Волков', avatar: 'СВ', status: 'offline' }
   ];
 
-  const messages: Message[] = [
-    { id: 1, name: 'Анна Петрова', avatar: 'АП', lastMessage: 'Привет! Как дела?', time: '10:24', unread: 2 },
-    { id: 2, name: 'Дмитрий Иванов', avatar: 'ДИ', lastMessage: 'Увидимся завтра', time: '09:15', unread: 0 },
-    { id: 3, name: 'Мария Сидорова', avatar: 'МС', lastMessage: 'Спасибо за помощь!', time: 'Вчера', unread: 1 }
-  ];
+  const [conversations, setConversations] = useState<Conversation[]>([
+    { 
+      id: 1, 
+      name: 'Анна Петрова', 
+      avatar: 'АП', 
+      lastMessage: 'Привет! Как дела?', 
+      time: '10:24', 
+      unread: 2,
+      messages: [
+        { id: 1, senderId: 1, senderName: 'Анна Петрова', senderAvatar: 'АП', text: 'Привет! Как твои дела?', time: '10:20' },
+        { id: 2, senderId: 0, senderName: 'Вася Иванов', senderAvatar: 'ВИ', text: 'Привет! Отлично, спасибо! У тебя как?', time: '10:22' },
+        { id: 3, senderId: 1, senderName: 'Анна Петрова', senderAvatar: 'АП', text: 'Тоже хорошо! Работаю над новым проектом', time: '10:24' }
+      ]
+    },
+    { 
+      id: 2, 
+      name: 'Дмитрий Иванов', 
+      avatar: 'ДИ', 
+      lastMessage: 'Увидимся завтра', 
+      time: '09:15', 
+      unread: 0,
+      messages: [
+        { id: 4, senderId: 2, senderName: 'Дмитрий Иванов', senderAvatar: 'ДИ', text: 'Привет! Встретимся завтра?', time: '09:10' },
+        { id: 5, senderId: 0, senderName: 'Вася Иванов', senderAvatar: 'ВИ', text: 'Да, конечно! Во сколько?', time: '09:12' },
+        { id: 6, senderId: 2, senderName: 'Дмитрий Иванов', senderAvatar: 'ДИ', text: 'В 15:00 у кафе. Увидимся завтра', time: '09:15' }
+      ]
+    },
+    { 
+      id: 3, 
+      name: 'Мария Сидорова', 
+      avatar: 'МС', 
+      lastMessage: 'Спасибо за помощь!', 
+      time: 'Вчера', 
+      unread: 1,
+      messages: [
+        { id: 7, senderId: 3, senderName: 'Мария Сидорова', senderAvatar: 'МС', text: 'Помоги с проектом, пожалуйста', time: 'Вчера' },
+        { id: 8, senderId: 0, senderName: 'Вася Иванов', senderAvatar: 'ВИ', text: 'Конечно, чем помочь?', time: 'Вчера' },
+        { id: 9, senderId: 3, senderName: 'Мария Сидорова', senderAvatar: 'МС', text: 'Спасибо за помощь!', time: 'Вчера' }
+      ]
+    }
+  ]);
 
   const notifications: Notification[] = [
     { id: 1, type: 'like', user: 'Анна Петрова', content: 'понравился ваш пост', time: '5 минут назад' },
@@ -1008,29 +1080,29 @@ const Index = () => {
                   <Input placeholder="Поиск сообщений..." className="rounded-none border-2" />
                 </div>
                 <ScrollArea className="h-[calc(100%-73px)]">
-                  {messages.map((msg) => (
+                  {conversations.map((conv) => (
                     <button
-                      key={msg.id}
-                      onClick={() => setSelectedChat(msg.id)}
+                      key={conv.id}
+                      onClick={() => setSelectedChat(conv.id)}
                       className={`w-full p-4 flex gap-3 border-b-2 ${borderColor} hover:bg-white/5 transition-colors ${
-                        selectedChat === msg.id ? `${cardBg} border-l-4 border-l-[#0078D7]` : ''
+                        selectedChat === conv.id ? `${cardBg} border-l-4 border-l-[#0078D7]` : ''
                       }`}
                     >
                       <Avatar className="h-12 w-12 rounded-none">
                         <AvatarFallback className="bg-[#00BCF2] text-white rounded-none font-bold">
-                          {msg.avatar}
+                          {conv.avatar}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 text-left">
                         <div className="flex justify-between items-start mb-1">
-                          <span className={`font-semibold ${textColor}`}>{msg.name}</span>
-                          <span className="text-xs text-gray-500">{msg.time}</span>
+                          <span className={`font-semibold ${textColor}`}>{conv.name}</span>
+                          <span className="text-xs text-gray-500">{conv.time}</span>
                         </div>
-                        <div className="text-sm text-gray-600 truncate">{msg.lastMessage}</div>
+                        <div className="text-sm text-gray-600 truncate">{conv.lastMessage}</div>
                       </div>
-                      {msg.unread > 0 && (
+                      {conv.unread > 0 && (
                         <Badge className="bg-[#E81123] rounded-none h-5 w-5 p-0 flex items-center justify-center text-xs">
-                          {msg.unread}
+                          {conv.unread}
                         </Badge>
                       )}
                     </button>
@@ -1044,12 +1116,12 @@ const Index = () => {
                     <div className={`p-4 border-b-2 ${borderColor} ${cardBg} flex items-center gap-3`}>
                       <Avatar className="h-10 w-10 rounded-none">
                         <AvatarFallback className="bg-[#00BCF2] text-white rounded-none font-bold">
-                          {messages.find((m) => m.id === selectedChat)?.avatar}
+                          {conversations.find((c) => c.id === selectedChat)?.avatar}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1">
                         <div className={`font-semibold ${textColor}`}>
-                          {messages.find((m) => m.id === selectedChat)?.name}
+                          {conversations.find((c) => c.id === selectedChat)?.name}
                         </div>
                         <div className="text-sm text-[#7FBA00]">В сети</div>
                       </div>
@@ -1063,30 +1135,36 @@ const Index = () => {
 
                     <ScrollArea className={`flex-1 p-6 ${isDarkMode ? 'bg-[#1E1E1E]' : 'bg-gray-50'}`}>
                       <div className="space-y-4">
-                        <div className="flex justify-end">
-                          <div className="bg-[#0078D7] text-white p-3 max-w-md">
-                            <p>Привет! Как твои дела?</p>
-                            <span className="text-xs opacity-70">10:20</span>
+                        {conversations.find((c) => c.id === selectedChat)?.messages.map((msg) => (
+                          <div key={msg.id} className={`flex ${msg.senderId === 0 ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-md ${msg.senderId === 0 ? 'bg-[#0078D7] text-white' : `${cardBg} border-2 ${borderColor}`} p-3 rounded`}>
+                              {msg.media && (
+                                <div className="mb-2">
+                                  {msg.mediaType === 'image' ? (
+                                    <img src={msg.media} alt="Attachment" className="max-w-full rounded" />
+                                  ) : msg.mediaType === 'video' ? (
+                                    <video controls className="max-w-full rounded">
+                                      <source src={msg.media} />
+                                    </video>
+                                  ) : null}
+                                </div>
+                              )}
+                              {msg.text && <p className={msg.senderId === 0 ? 'text-white' : textColor}>{renderTextWithLinks(msg.text)}</p>}
+                              <span className={`text-xs ${msg.senderId === 0 ? 'opacity-70' : 'text-gray-500'}`}>{msg.time}</span>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex">
-                          <div className={`${cardBg} border-2 ${borderColor} p-3 max-w-md`}>
-                            <p className={textColor}>Отлично, спасибо! У тебя как?</p>
-                            <span className="text-xs text-gray-500">10:22</span>
-                          </div>
-                        </div>
-                        <div className="flex justify-end">
-                          <div className="bg-[#0078D7] text-white p-3 max-w-md">
-                            <p>Тоже хорошо! Работаю над новым проектом</p>
-                            <span className="text-xs opacity-70">10:24</span>
-                          </div>
-                        </div>
+                        ))}
                       </div>
                     </ScrollArea>
 
                     <div className={`p-4 border-t-2 ${borderColor} ${cardBg}`}>
                       <div className="flex gap-2 mb-2">
-                        <Button variant="ghost" size="icon" className="rounded-none" onClick={() => document.getElementById('msg-file')?.click()}>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="rounded-none" 
+                          onClick={() => document.getElementById('msg-file')?.click()}
+                        >
                           <Icon name="Paperclip" size={20} />
                         </Button>
                         <Input 
@@ -1099,13 +1177,24 @@ const Index = () => {
                         <Button onClick={handleSendMessage} className="bg-[#0078D7] hover:bg-[#005a9e] rounded-none">
                           <Icon name="Send" size={20} />
                         </Button>
-                        <input type="file" id="msg-file" accept="image/*,video/*" className="hidden" onChange={handleMediaUpload} />
+                        <input 
+                          type="file" 
+                          id="msg-file" 
+                          accept="image/*,video/*" 
+                          className="hidden" 
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              setMessageMediaFile(e.target.files[0]);
+                              toast({ title: `Файл загружен: ${e.target.files[0].name}` });
+                            }
+                          }} 
+                        />
                       </div>
-                      {mediaFile && (
+                      {messageMediaFile && (
                         <div className="flex items-center gap-2 p-2 bg-[#0078D7]/10 rounded">
                           <Icon name="File" size={16} className="text-[#0078D7]" />
-                          <span className="text-sm">{mediaFile.name}</span>
-                          <Button size="sm" variant="ghost" onClick={() => setMediaFile(null)}>
+                          <span className="text-sm">{messageMediaFile.name}</span>
+                          <Button size="sm" variant="ghost" onClick={() => setMessageMediaFile(null)}>
                             <Icon name="X" size={14} />
                           </Button>
                         </div>
