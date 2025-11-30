@@ -1322,13 +1322,29 @@ const Index = () => {
                     <div className="space-y-3">
                       {friendRequests.map((request) => (
                         <div key={request.id} className={`flex items-center gap-4 p-4 border-2 ${borderColor} rounded hover:bg-[#0078D7]/5 transition-colors`}>
-                          <Avatar className="h-16 w-16 rounded-none">
+                          <Avatar 
+                            className="h-16 w-16 rounded-none cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => {
+                              const requestProfile = allUsers.find(u => u.id === request.userId);
+                              if (requestProfile) {
+                                handleViewProfile(requestProfile.id);
+                              }
+                            }}
+                          >
                             <AvatarFallback className="bg-[#00BCF2] text-white rounded-none text-xl font-bold">
                               {request.avatar}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1">
-                            <h4 className={`font-semibold ${textColor}`}>{request.name}</h4>
+                            <h4 
+                              className={`font-semibold ${textColor} cursor-pointer hover:text-[#0078D7] transition-colors`}
+                              onClick={() => {
+                                const requestProfile = allUsers.find(u => u.id === request.userId);
+                                if (requestProfile) {
+                                  handleViewProfile(requestProfile.id);
+                                }
+                              }}
+                            >{request.name}</h4>
                             <p className="text-sm text-gray-500">{request.mutualFriends} общих друзей</p>
                             <p className="text-xs text-gray-400">{request.time}</p>
                           </div>
@@ -1484,22 +1500,38 @@ const Index = () => {
                   <Input placeholder="Поиск сообщений..." className="rounded-none border-2" />
                 </div>
                 <ScrollArea className="h-[calc(100%-73px)]">
-                  {conversations.map((conv) => (
-                    <button
+                  {conversations.map((conv) => {
+                    const convProfile = allUsers.find(u => u.id === conv.id);
+                    return (
+                    <div
                       key={conv.id}
-                      onClick={() => setSelectedChat(conv.id)}
                       className={`w-full p-4 flex gap-3 border-b-2 ${borderColor} hover:bg-white/5 transition-colors ${
                         selectedChat === conv.id ? `${cardBg} border-l-4 border-l-[#0078D7]` : ''
                       }`}
                     >
-                      <Avatar className="h-12 w-12 rounded-none">
+                      <Avatar 
+                        className="h-12 w-12 rounded-none cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => {
+                          if (convProfile) {
+                            handleViewProfile(convProfile.id);
+                          }
+                        }}
+                      >
                         <AvatarFallback className="bg-[#00BCF2] text-white rounded-none font-bold">
                           {conv.avatar}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex-1 text-left">
+                      <div className="flex-1 text-left cursor-pointer" onClick={() => setSelectedChat(conv.id)}>
                         <div className="flex justify-between items-start mb-1">
-                          <span className={`font-semibold ${textColor}`}>{conv.name}</span>
+                          <span 
+                            className={`font-semibold ${textColor} hover:text-[#0078D7] transition-colors`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (convProfile) {
+                                handleViewProfile(convProfile.id);
+                              }
+                            }}
+                          >{conv.name}</span>
                           <span className="text-xs text-gray-500">{conv.time}</span>
                         </div>
                         <div className="text-sm text-gray-600 truncate">{conv.lastMessage}</div>
@@ -1509,8 +1541,8 @@ const Index = () => {
                           {conv.unread}
                         </Badge>
                       )}
-                    </button>
-                  ))}
+                    </div>
+                  );})}
                 </ScrollArea>
               </div>
 
@@ -1518,13 +1550,29 @@ const Index = () => {
                 {selectedChat ? (
                   <>
                     <div className={`p-4 border-b-2 ${borderColor} ${cardBg} flex items-center gap-3`}>
-                      <Avatar className="h-10 w-10 rounded-none">
+                      <Avatar 
+                        className="h-10 w-10 rounded-none cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => {
+                          const chatProfile = allUsers.find(u => u.id === selectedChat);
+                          if (chatProfile) {
+                            handleViewProfile(chatProfile.id);
+                          }
+                        }}
+                      >
                         <AvatarFallback className="bg-[#00BCF2] text-white rounded-none font-bold">
                           {conversations.find((c) => c.id === selectedChat)?.avatar}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1">
-                        <div className={`font-semibold ${textColor}`}>
+                        <div 
+                          className={`font-semibold ${textColor} cursor-pointer hover:text-[#0078D7] transition-colors`}
+                          onClick={() => {
+                            const chatProfile = allUsers.find(u => u.id === selectedChat);
+                            if (chatProfile) {
+                              handleViewProfile(chatProfile.id);
+                            }
+                          }}
+                        >
                           {conversations.find((c) => c.id === selectedChat)?.name}
                         </div>
                         <div className="text-sm text-[#7FBA00]">В сети</div>
@@ -1643,7 +1691,15 @@ const Index = () => {
                         </div>
                         <div className="flex-1">
                           <p className={textColor}>
-                            <span className="font-semibold">{notif.user}</span> {notif.content}
+                            <span 
+                              className="font-semibold cursor-pointer hover:text-[#0078D7] transition-colors"
+                              onClick={() => {
+                                const notifProfile = allUsers.find(u => u.name === notif.user);
+                                if (notifProfile) {
+                                  handleViewProfile(notifProfile.id);
+                                }
+                              }}
+                            >{notif.user}</span> {notif.content}
                           </p>
                           <span className="text-sm text-gray-500">{notif.time}</span>
                         </div>
