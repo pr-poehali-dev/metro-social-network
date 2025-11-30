@@ -139,6 +139,7 @@ const Index = () => {
   const [imageViewMode, setImageViewMode] = useState<'fit' | 'fill' | 'original'>('fit');
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
+  const [friendStatusFilter, setFriendStatusFilter] = useState<'all' | 'online' | 'offline'>('all');
   const [friendsList, setFriendsList] = useState<Friend[]>([
     { id: 1, name: 'Анна Петрова', avatar: 'АП', status: 'online' },
     { id: 2, name: 'Дмитрий Иванов', avatar: 'ДИ', status: 'online' },
@@ -680,9 +681,11 @@ const Index = () => {
     toast({ title: `Заявка от ${name} отклонена` });
   };
 
-  const filteredFriends = friendsList.filter(friend => 
-    friend.name.toLowerCase().includes(friendSearchQuery.toLowerCase())
-  );
+  const filteredFriends = friendsList.filter(friend => {
+    const matchesSearch = friend.name.toLowerCase().includes(friendSearchQuery.toLowerCase());
+    const matchesStatus = friendStatusFilter === 'all' || friend.status === friendStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const allUsers = [
     ...userProfiles,
@@ -1359,6 +1362,44 @@ const Index = () => {
                       Найти друзей
                     </Button>
                   </div>
+                  <div className="flex gap-2 mb-4">
+                    <Button 
+                      onClick={() => setFriendStatusFilter('all')}
+                      className={`rounded-none ${
+                        friendStatusFilter === 'all' 
+                          ? 'bg-[#0078D7] hover:bg-[#005a9e]' 
+                          : 'bg-gray-500 hover:bg-gray-600'
+                      }`}
+                      size="sm"
+                    >
+                      <Icon name="Users" size={14} className="mr-2" />
+                      Все ({friendsList.length})
+                    </Button>
+                    <Button 
+                      onClick={() => setFriendStatusFilter('online')}
+                      className={`rounded-none ${
+                        friendStatusFilter === 'online' 
+                          ? 'bg-[#7FBA00] hover:bg-[#6a9e00]' 
+                          : 'bg-gray-500 hover:bg-gray-600'
+                      }`}
+                      size="sm"
+                    >
+                      <Icon name="Wifi" size={14} className="mr-2" />
+                      В сети ({friendsList.filter(f => f.status === 'online').length})
+                    </Button>
+                    <Button 
+                      onClick={() => setFriendStatusFilter('offline')}
+                      className={`rounded-none ${
+                        friendStatusFilter === 'offline' 
+                          ? 'bg-gray-600 hover:bg-gray-700' 
+                          : 'bg-gray-500 hover:bg-gray-600'
+                      }`}
+                      size="sm"
+                    >
+                      <Icon name="WifiOff" size={14} className="mr-2" />
+                      Не в сети ({friendsList.filter(f => f.status === 'offline').length})
+                    </Button>
+                  </div>
                   <Input 
                     placeholder="Поиск среди друзей..." 
                     className="rounded-none border-2 mb-4"
@@ -1370,7 +1411,14 @@ const Index = () => {
                   <div className="text-center py-12">
                     <Icon name="Users" size={64} className="mx-auto mb-4 text-gray-400 opacity-50" />
                     <p className="text-gray-500 text-lg">
-                      {friendSearchQuery ? 'Друзья не найдены' : 'У вас пока нет друзей'}
+                      {friendSearchQuery 
+                        ? 'Друзья не найдены' 
+                        : friendStatusFilter === 'online' 
+                          ? 'Нет друзей в сети' 
+                          : friendStatusFilter === 'offline'
+                            ? 'Нет друзей не в сети'
+                            : 'У вас пока нет друзей'
+                      }
                     </p>
                   </div>
                 ) : (
