@@ -436,39 +436,6 @@ const Index = () => {
     setIsPlaying(!isPlaying);
   };
 
-  const handleRemoveFriend = (friendId: number) => {
-    const friend = friendsList.find(f => f.id === friendId);
-    setFriendsList(prev => prev.filter(f => f.id !== friendId));
-    toast({ title: `${friend?.name} удалён из друзей` });
-  };
-
-  const filteredFriends = friendsList.filter(friend => 
-    friend.name.toLowerCase().includes(friendSearchQuery.toLowerCase())
-  );
-
-  const allUsers = [
-    ...userProfiles,
-    ...searchUsers.map(u => ({
-      id: u.id,
-      name: u.name,
-      avatar: u.avatar,
-      bio: 'Пользователь сети',
-      location: 'Россия',
-      work: '-',
-      friends: u.mutualFriends * 10,
-      photos: 0,
-      followers: 0,
-      status: 'offline' as const,
-      posts: []
-    }))
-  ];
-
-  const filteredSearchResults = globalSearchQuery.trim() 
-    ? allUsers.filter(user => 
-        user.name.toLowerCase().includes(globalSearchQuery.toLowerCase())
-      )
-    : [];
-
   const [conversations, setConversations] = useState<Conversation[]>([
     { 
       id: 1, 
@@ -627,6 +594,39 @@ const Index = () => {
         return 'object-contain max-h-[80vh]';
     }
   };
+
+  const handleRemoveFriend = (friendId: number) => {
+    const friend = friendsList.find(f => f.id === friendId);
+    setFriendsList(prev => prev.filter(f => f.id !== friendId));
+    toast({ title: `${friend?.name} удалён из друзей` });
+  };
+
+  const filteredFriends = friendsList.filter(friend => 
+    friend.name.toLowerCase().includes(friendSearchQuery.toLowerCase())
+  );
+
+  const allUsers = [
+    ...userProfiles,
+    ...searchUsers.map(u => ({
+      id: u.id,
+      name: u.name,
+      avatar: u.avatar,
+      bio: 'Пользователь сети',
+      location: 'Россия',
+      work: '-',
+      friends: u.mutualFriends * 10,
+      photos: 0,
+      followers: 0,
+      status: 'offline' as const,
+      posts: []
+    }))
+  ];
+
+  const filteredSearchResults = globalSearchQuery.trim() 
+    ? allUsers.filter(user => 
+        user.name.toLowerCase().includes(globalSearchQuery.toLowerCase())
+      )
+    : [];
 
   const navItems = [
     { id: 'feed' as View, icon: 'Home', label: 'Лента', color: 'bg-[#0078D7]' },
