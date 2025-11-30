@@ -50,6 +50,15 @@ interface Friend {
   status: 'online' | 'offline';
 }
 
+interface FriendRequest {
+  id: number;
+  userId: number;
+  name: string;
+  avatar: string;
+  mutualFriends: number;
+  time: string;
+}
+
 interface ChatMessage {
   id: number;
   senderId: number;
@@ -137,6 +146,11 @@ const Index = () => {
     { id: 5, name: 'Елена Козлова', avatar: 'ЕК', status: 'online' },
     { id: 6, name: 'Сергей Волков', avatar: 'СВ', status: 'offline' }
   ]);
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([
+    { id: 1, userId: 10, name: 'Олег Кузнецов', avatar: 'ОК', mutualFriends: 5, time: '2 часа назад' },
+    { id: 2, userId: 11, name: 'Ирина Морозова', avatar: 'ИМ', mutualFriends: 12, time: '5 часов назад' }
+  ]);
+  const [sentRequests, setSentRequests] = useState<Set<number>>(new Set());
   const [settings, setSettings] = useState({
     privacy: {
       profileVisibility: 'everyone',
@@ -601,6 +615,22 @@ const Index = () => {
     toast({ title: `${friend?.name} удалён из друзей` });
   };
 
+  const handleSendFriendRequest = (userId: number, userName: string) => {
+    setSentRequests(prev => new Set(prev).add(userId));
+    toast({ title: `Заявка отправлена ${userName}` });
+  };
+
+  const handleAcceptRequest = (requestId: number, userId: number, name: string, avatar: string) => {
+    setFriendRequests(prev => prev.filter(req => req.id !== requestId));
+    setFriendsList(prev => [...prev, { id: userId, name, avatar, status: 'online' }]);
+    toast({ title: `${name} добавлен в друзья` });
+  };
+
+  const handleDeclineRequest = (requestId: number, name: string) => {
+    setFriendRequests(prev => prev.filter(req => req.id !== requestId));
+    toast({ title: `Заявка от ${name} отклонена` });
+  };
+
   const filteredFriends = friendsList.filter(friend => 
     friend.name.toLowerCase().includes(friendSearchQuery.toLowerCase())
   );
@@ -631,7 +661,7 @@ const Index = () => {
   const navItems = [
     { id: 'feed' as View, icon: 'Home', label: 'Лента', color: 'bg-[#0078D7]' },
     { id: 'profile' as View, icon: 'User', label: 'Профиль', color: 'bg-[#00BCF2]' },
-    { id: 'friends' as View, icon: 'Users', label: 'Друзья', color: 'bg-[#7FBA00]' },
+    { id: 'friends' as View, icon: 'Users', label: 'Друзья', color: 'bg-[#7FBA00]', badge: friendRequests.length },
     { id: 'messages' as View, icon: 'MessageSquare', label: 'Сообщения', color: 'bg-[#FFB900]' },
     { id: 'music' as View, icon: 'Music', label: 'Музыка', color: 'bg-[#9b87f5]' },
     { id: 'notifications' as View, icon: 'Bell', label: 'Уведомления', color: 'bg-[#E81123]' }
@@ -792,10 +822,15 @@ const Index = () => {
             onClick={() => setCurrentView(item.id)}
             className={`${item.color} ${
               currentView === item.id ? 'ring-2 ring-white ring-offset-2 ring-offset-[#2D2D30]' : ''
-            } text-white p-4 flex items-center gap-3 transition-all hover:scale-105 active:scale-95`}
+            } text-white p-4 flex items-center gap-3 transition-all hover:scale-105 active:scale-95 relative`}
           >
             <Icon name={item.icon} size={24} />
             <span className="font-medium">{item.label}</span>
+            {item.badge && item.badge > 0 && (
+              <Badge className="absolute top-2 right-2 bg-[#E81123] rounded-none h-5 w-5 p-0 flex items-center justify-center text-xs">
+                {item.badge}
+              </Badge>
+            )}
           </button>
         ))}
 
@@ -1226,6 +1261,47 @@ const Index = () => {
           {currentView === 'friends' && (
             <ScrollArea className="h-full">
               <div className="max-w-5xl mx-auto p-6">
+                {friendRequests.length > 0 && (
+                  <Card className={`p-6 rounded-none border-2 ${borderColor} ${cardBg} mb-6`}>
+                    <h3 className={`text-xl font-bold mb-4 ${textColor} flex items-center gap-2`}>
+                      <Icon name="UserPlus" size={24} className="text-[#0078D7]" />
+                      Заявки в друзья ({friendRequests.length})
+                    </h3>
+                    <div className="space-y-3">
+                      {friendRequests.map((request) => (
+                        <div key={request.id} className={`flex items-center gap-4 p-4 border-2 ${borderColor} rounded hover:bg-[#0078D7]/5 transition-colors`}>
+                          <Avatar className="h-16 w-16 rounded-none">
+                            <AvatarFallback className="bg-[#00BCF2] text-white rounded-none text-xl font-bold">
+                              {request.avatar}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <h4 className={`font-semibold ${textColor}`}>{request.name}</h4>
+                            <p className="text-sm text-gray-500">{request.mutualFriends} общих друзей</p>
+                            <p className="text-xs text-gray-400">{request.time}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button 
+                              onClick={() => handleAcceptRequest(request.id, request.userId, request.name, request.avatar)}
+                              className="bg-[#7FBA00] hover:bg-[#6a9e00] rounded-none"
+                            >
+                              <Icon name="Check" size={16} className="mr-2" />
+                              Принять
+                            </Button>
+                            <Button 
+                              onClick={() => handleDeclineRequest(request.id, request.name)}
+                              variant="outline"
+                              className="rounded-none border-2 text-[#E81123] hover:bg-[#E81123]/10"
+                            >
+                              <Icon name="X" size={16} className="mr-2" />
+                              Отклонить
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className={`text-2xl font-bold ${textColor}`}>Мои друзья ({friendsList.length})</h2>
@@ -1583,15 +1659,31 @@ const Index = () => {
                     <h4 className="font-semibold">{user.name}</h4>
                     <p className="text-sm text-gray-500">{user.work}</p>
                   </div>
-                  <Button 
-                    onClick={() => {
-                      handleSubscribe(user.id);
-                    }} 
-                    className={`${subscribedUsers.has(user.id) ? 'bg-gray-500 hover:bg-gray-600' : 'bg-[#7FBA00] hover:bg-[#6a9e00]'} rounded-none`}
-                  >
-                    <Icon name={subscribedUsers.has(user.id) ? 'UserCheck' : 'UserPlus'} size={16} className="mr-2" />
-                    {subscribedUsers.has(user.id) ? 'Подписан' : 'Подписаться'}
-                  </Button>
+                  {friendsList.some(f => f.id === user.id) ? (
+                    <Button 
+                      className="bg-[#7FBA00] hover:bg-[#6a9e00] rounded-none"
+                      disabled
+                    >
+                      <Icon name="UserCheck" size={16} className="mr-2" />
+                      В друзьях
+                    </Button>
+                  ) : sentRequests.has(user.id) ? (
+                    <Button 
+                      className="bg-gray-500 hover:bg-gray-600 rounded-none"
+                      disabled
+                    >
+                      <Icon name="Clock" size={16} className="mr-2" />
+                      Отправлена
+                    </Button>
+                  ) : (
+                    <Button 
+                      onClick={() => handleSendFriendRequest(user.id, user.name)} 
+                      className="bg-[#0078D7] hover:bg-[#005a9e] rounded-none"
+                    >
+                      <Icon name="UserPlus" size={16} className="mr-2" />
+                      Добавить
+                    </Button>
+                  )}
                 </Card>
               ))}
             </div>
@@ -1980,13 +2072,31 @@ const Index = () => {
                         )}
                       </div>
                       <div className="flex gap-2">
-                        <Button 
-                          onClick={() => handleSubscribe(viewingProfile.id)}
-                          className={`${subscribedUsers.has(viewingProfile.id) ? 'bg-gray-500 hover:bg-gray-600' : 'bg-[#0078D7] hover:bg-[#005a9e]'} rounded-none`}
-                        >
-                          <Icon name={subscribedUsers.has(viewingProfile.id) ? 'UserCheck' : 'UserPlus'} size={16} className="mr-2" />
-                          {subscribedUsers.has(viewingProfile.id) ? 'Отписаться' : 'Подписаться'}
-                        </Button>
+                        {friendsList.some(f => f.id === viewingProfile.id) ? (
+                          <Button 
+                            className="bg-[#7FBA00] hover:bg-[#6a9e00] rounded-none"
+                            disabled
+                          >
+                            <Icon name="UserCheck" size={16} className="mr-2" />
+                            В друзьях
+                          </Button>
+                        ) : sentRequests.has(viewingProfile.id) ? (
+                          <Button 
+                            className="bg-gray-500 hover:bg-gray-600 rounded-none"
+                            disabled
+                          >
+                            <Icon name="Clock" size={16} className="mr-2" />
+                            Заявка отправлена
+                          </Button>
+                        ) : (
+                          <Button 
+                            onClick={() => handleSendFriendRequest(viewingProfile.id, viewingProfile.name)}
+                            className="bg-[#0078D7] hover:bg-[#005a9e] rounded-none"
+                          >
+                            <Icon name="UserPlus" size={16} className="mr-2" />
+                            Добавить в друзья
+                          </Button>
+                        )}
                         <Button 
                           variant="outline" 
                           className="rounded-none border-2"
