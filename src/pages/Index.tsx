@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -10,11 +10,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 
-type View = 'feed' | 'profile' | 'friends' | 'messages' | 'notifications';
+type View = 'feed' | 'profile' | 'friends' | 'messages' | 'notifications' | 'music';
+
+interface Comment {
+  id: number;
+  author: string;
+  avatar: string;
+  content: string;
+  likes: number;
+  time: string;
+  replies: Comment[];
+}
 
 interface Post {
   id: number;
@@ -24,7 +36,7 @@ interface Post {
   image?: string;
   video?: string;
   likes: number;
-  comments: number;
+  comments: Comment[];
   time: string;
 }
 
@@ -59,8 +71,17 @@ interface SearchUser {
   mutualFriends: number;
 }
 
+interface Track {
+  id: number;
+  title: string;
+  artist: string;
+  duration: string;
+  cover: string;
+}
+
 const Index = () => {
   const { toast } = useToast();
+  const audioRef = useRef<HTMLAudioElement>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
@@ -71,15 +92,59 @@ const Index = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isFindFriendsOpen, setIsFindFriendsOpen] = useState(false);
+  const [isAddMusicOpen, setIsAddMusicOpen] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [newPost, setNewPost] = useState('');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [videoQuality, setVideoQuality] = useState('720p');
+  const [expandedComments, setExpandedComments] = useState<Record<number, boolean>>({});
+  const [commentText, setCommentText] = useState<Record<number, string>>({});
+  const [replyingTo, setReplyingTo] = useState<{ postId: number; commentId: number } | null>(null);
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [volume, setVolume] = useState([70]);
+  const [likedComments, setLikedComments] = useState<Set<number>>(new Set());
+  const [likedPosts, setLikedPosts] = useState<Set<number>>(new Set());
   const [profileEdit, setProfileEdit] = useState({ 
     name: 'Вася Иванов', 
     bio: 'Люблю создавать красивые и функциональные веб-приложения. В свободное время увлекаюсь фотографией и путешествиями.', 
     location: 'Москва, Россия', 
     work: 'IT Company' 
   });
+  const [posts, setPosts] = useState<Post[]>([
+    {
+      id: 1,
+      author: 'Анна Петрова',
+      avatar: 'АП',
+      content: 'Отличная погода сегодня! Провела весь день в парке 🌳',
+      image: 'https://images.unsplash.com/photo-1541963463532-d68292c34b19?w=800',
+      likes: 24,
+      comments: [
+        { id: 101, author: 'Дмитрий', avatar: 'Д', content: 'Красиво! Где это?', likes: 3, time: '1 час назад', replies: [] },
+        { id: 102, author: 'Мария', avatar: 'М', content: 'Согласна, погода шикарная!', likes: 5, time: '30 мин назад', replies: [] }
+      ],
+      time: '2 часа назад'
+    },
+    {
+      id: 2,
+      author: 'Дмитрий Иванов',
+      avatar: 'ДИ',
+      content: 'Запустил новый проект! Долго работал над этим, наконец-то готово 🚀',
+      video: 'https://www.w3schools.com/html/mov_bbb.mp4',
+      likes: 56,
+      comments: [
+        { id: 201, author: 'Елена', avatar: 'Е', content: 'Поздравляю! Молодец!', likes: 8, time: '2 часа назад', replies: [] }
+      ],
+      time: '4 часа назад'
+    }
+  ]);
+
+  const [tracks, setTracks] = useState<Track[]>([
+    { id: 1, title: 'Summer Vibes', artist: 'DJ Metro', duration: '3:45', cover: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300' },
+    { id: 2, title: 'Night Rhythm', artist: 'Beat Maker', duration: '4:12', cover: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300' },
+    { id: 3, title: 'Electronic Dreams', artist: 'Synth Wave', duration: '5:03', cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300' },
+    { id: 4, title: 'Urban Beats', artist: 'City Sound', duration: '3:28', cover: 'https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=300' }
+  ]);
 
   useEffect(() => {
     const auth = localStorage.getItem('isAuth');
@@ -143,38 +208,67 @@ const Index = () => {
     }
   };
 
-  const posts: Post[] = [
-    {
-      id: 1,
-      author: 'Анна Петрова',
-      avatar: 'АП',
-      content: 'Отличная погода сегодня! Провела весь день в парке 🌳',
-      image: 'https://images.unsplash.com/photo-1541963463532-d68292c34b19?w=800',
-      likes: 24,
-      comments: 5,
-      time: '2 часа назад'
-    },
-    {
-      id: 2,
-      author: 'Дмитрий Иванов',
-      avatar: 'ДИ',
-      content: 'Запустил новый проект! Долго работал над этим, наконец-то готово 🚀',
-      video: 'https://www.w3schools.com/html/mov_bbb.mp4',
-      likes: 56,
-      comments: 12,
-      time: '4 часа назад'
-    },
-    {
-      id: 3,
-      author: 'Мария Сидорова',
-      avatar: 'МС',
-      content: 'Кто-нибудь знает хорошее кафе в центре? Нужно встретиться с клиентом',
-      image: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=800',
-      likes: 8,
-      comments: 15,
-      time: '5 часов назад'
-    }
-  ];
+  const toggleComments = (postId: number) => {
+    setExpandedComments(prev => ({ ...prev, [postId]: !prev[postId] }));
+  };
+
+  const handleAddComment = (postId: number) => {
+    const text = commentText[postId];
+    if (!text?.trim()) return;
+    
+    setPosts(posts.map(post => {
+      if (post.id === postId) {
+        const newComment: Comment = {
+          id: Date.now(),
+          author: currentUser.name,
+          avatar: currentUser.avatar,
+          content: text,
+          likes: 0,
+          time: 'Только что',
+          replies: []
+        };
+        return { ...post, comments: [...post.comments, newComment] };
+      }
+      return post;
+    }));
+    
+    setCommentText(prev => ({ ...prev, [postId]: '' }));
+    toast({ title: 'Комментарий добавлен' });
+  };
+
+  const handleLikeComment = (commentId: number) => {
+    setLikedComments(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(commentId)) {
+        newSet.delete(commentId);
+      } else {
+        newSet.add(commentId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleLikePost = (postId: number) => {
+    setLikedPosts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(postId)) {
+        newSet.delete(postId);
+      } else {
+        newSet.add(postId);
+      }
+      return newSet;
+    });
+  };
+
+  const playTrack = (track: Track) => {
+    setCurrentTrack(track);
+    setIsPlaying(true);
+    toast({ title: `Играет: ${track.title}` });
+  };
+
+  const togglePlay = () => {
+    setIsPlaying(!isPlaying);
+  };
 
   const friends: Friend[] = [
     { id: 1, name: 'Анна Петрова', avatar: 'АП', status: 'online' },
@@ -210,6 +304,7 @@ const Index = () => {
     { id: 'profile' as View, icon: 'User', label: 'Профиль', color: 'bg-[#00BCF2]' },
     { id: 'friends' as View, icon: 'Users', label: 'Друзья', color: 'bg-[#7FBA00]' },
     { id: 'messages' as View, icon: 'MessageSquare', label: 'Сообщения', color: 'bg-[#FFB900]' },
+    { id: 'music' as View, icon: 'Music', label: 'Музыка', color: 'bg-[#9b87f5]' },
     { id: 'notifications' as View, icon: 'Bell', label: 'Уведомления', color: 'bg-[#E81123]' }
   ];
 
@@ -293,6 +388,54 @@ const Index = () => {
       </div>
     );
   }
+
+  const renderComments = (comments: Comment[], postId: number, depth = 0) => {
+    return comments.map(comment => {
+      const isLiked = likedComments.has(comment.id);
+      const displayLikes = comment.likes + (isLiked ? 1 : 0);
+      
+      return (
+        <div key={comment.id} className={`${depth > 0 ? 'ml-8 mt-3' : 'mt-3'}`}>
+          <div className={`p-3 ${cardBg} border ${borderColor} rounded`}>
+            <div className="flex gap-2 items-start">
+              <Avatar className="h-8 w-8 rounded-none">
+                <AvatarFallback className="bg-[#00BCF2] text-white rounded-none text-xs">
+                  {comment.avatar}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`font-semibold text-sm ${textColor}`}>{comment.author}</span>
+                  <span className="text-xs text-gray-500">{comment.time}</span>
+                </div>
+                <p className={`text-sm ${textColor} mb-2`}>{comment.content}</p>
+                <div className="flex gap-3">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleLikeComment(comment.id)}
+                    className={`h-6 px-2 gap-1 ${isLiked ? 'text-[#E81123]' : 'text-gray-500'} hover:text-[#E81123]`}
+                  >
+                    <Icon name="Heart" size={14} className={isLiked ? 'fill-current' : ''} />
+                    <span className="text-xs">{displayLikes}</span>
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setReplyingTo({ postId, commentId: comment.id })}
+                    className="h-6 px-2 text-xs text-gray-500 hover:text-[#0078D7]"
+                  >
+                    Ответить
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+          {comment.replies.length > 0 && renderComments(comment.replies, postId, depth + 1)}
+        </div>
+      );
+    });
+  };
 
   return (
     <div className={`h-screen flex overflow-hidden ${bgColor}`}>
@@ -392,49 +535,191 @@ const Index = () => {
                   </div>
                 </Card>
 
-                {posts.map((post) => (
-                  <Card key={post.id} className={`p-6 rounded-none border-2 ${borderColor} ${cardBg}`}>
-                    <div className="flex gap-3 mb-4">
-                      <Avatar className="h-12 w-12 rounded-none">
-                        <AvatarFallback className="bg-[#00BCF2] text-white rounded-none font-bold">
-                          {post.avatar}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className={`font-semibold ${textColor}`}>{post.author}</div>
-                        <div className="text-sm text-gray-500">{post.time}</div>
+                {posts.map((post) => {
+                  const isPostLiked = likedPosts.has(post.id);
+                  const displayPostLikes = post.likes + (isPostLiked ? 1 : 0);
+                  
+                  return (
+                    <Card key={post.id} className={`p-6 rounded-none border-2 ${borderColor} ${cardBg}`}>
+                      <div className="flex gap-3 mb-4">
+                        <Avatar className="h-12 w-12 rounded-none">
+                          <AvatarFallback className="bg-[#00BCF2] text-white rounded-none font-bold">
+                            {post.avatar}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className={`font-semibold ${textColor}`}>{post.author}</div>
+                          <div className="text-sm text-gray-500">{post.time}</div>
+                        </div>
                       </div>
-                    </div>
-                    <p className={`mb-4 ${textColor}`}>{post.content}</p>
-                    
-                    {post.image && (
-                      <img src={post.image} alt="Post" className="w-full mb-4 border-2 border-gray-200" />
-                    )}
-                    
-                    {post.video && (
-                      <video controls className="w-full mb-4 border-2 border-gray-200">
-                        <source src={post.video} type="video/mp4" />
-                      </video>
-                    )}
-                    
-                    <div className={`flex gap-6 pt-4 border-t-2 ${borderColor}`}>
-                      <Button variant="ghost" className="gap-2 text-[#0078D7] hover:bg-[#0078D7]/10 rounded-none">
-                        <Icon name="Heart" size={18} />
-                        <span className="font-semibold">{post.likes}</span>
-                      </Button>
-                      <Button variant="ghost" className="gap-2 text-[#0078D7] hover:bg-[#0078D7]/10 rounded-none">
-                        <Icon name="MessageCircle" size={18} />
-                        <span className="font-semibold">{post.comments}</span>
-                      </Button>
-                      <Button variant="ghost" className="gap-2 text-[#0078D7] hover:bg-[#0078D7]/10 rounded-none">
-                        <Icon name="Share2" size={18} />
-                        Поделиться
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
+                      <p className={`mb-4 ${textColor}`}>{post.content}</p>
+                      
+                      {post.image && (
+                        <img src={post.image} alt="Post" className="w-full mb-4 border-2 border-gray-200" />
+                      )}
+                      
+                      {post.video && (
+                        <div className="mb-4">
+                          <div className="flex justify-end mb-2">
+                            <Select value={videoQuality} onValueChange={setVideoQuality}>
+                              <SelectTrigger className="w-32 h-8 text-xs rounded-none">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="360p">360p</SelectItem>
+                                <SelectItem value="720p">720p</SelectItem>
+                                <SelectItem value="1080p">1080p</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <video controls className="w-full border-2 border-gray-200">
+                            <source src={post.video} type="video/mp4" />
+                          </video>
+                        </div>
+                      )}
+                      
+                      <div className={`flex gap-6 pt-4 border-t-2 ${borderColor}`}>
+                        <Button 
+                          variant="ghost" 
+                          onClick={() => handleLikePost(post.id)}
+                          className={`gap-2 ${isPostLiked ? 'text-[#E81123]' : 'text-[#0078D7]'} hover:bg-[#0078D7]/10 rounded-none`}
+                        >
+                          <Icon name="Heart" size={18} className={isPostLiked ? 'fill-current' : ''} />
+                          <span className="font-semibold">{displayPostLikes}</span>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          onClick={() => toggleComments(post.id)}
+                          className="gap-2 text-[#0078D7] hover:bg-[#0078D7]/10 rounded-none"
+                        >
+                          <Icon name="MessageCircle" size={18} />
+                          <span className="font-semibold">{post.comments.length}</span>
+                        </Button>
+                        <Button variant="ghost" className="gap-2 text-[#0078D7] hover:bg-[#0078D7]/10 rounded-none">
+                          <Icon name="Share2" size={18} />
+                          Поделиться
+                        </Button>
+                      </div>
+
+                      {expandedComments[post.id] && (
+                        <div className={`mt-4 pt-4 border-t ${borderColor}`}>
+                          <div className="flex gap-2 mb-4">
+                            <Avatar className="h-8 w-8 rounded-none">
+                              <AvatarFallback className="bg-[#0078D7] text-white rounded-none text-xs">
+                                {currentUser.avatar}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 flex gap-2">
+                              <Input
+                                placeholder="Написать комментарий..."
+                                value={commentText[post.id] || ''}
+                                onChange={(e) => setCommentText(prev => ({ ...prev, [post.id]: e.target.value }))}
+                                onKeyDown={(e) => e.key === 'Enter' && handleAddComment(post.id)}
+                                className="rounded-none border-2"
+                              />
+                              <Button 
+                                onClick={() => handleAddComment(post.id)}
+                                size="sm" 
+                                className="bg-[#0078D7] hover:bg-[#005a9e] rounded-none"
+                              >
+                                <Icon name="Send" size={16} />
+                              </Button>
+                            </div>
+                          </div>
+                          
+                          {post.comments.length > 0 && (
+                            <div className="space-y-2">
+                              {renderComments(post.comments, post.id)}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
               </div>
             </ScrollArea>
+          )}
+
+          {currentView === 'music' && (
+            <div className="h-full flex flex-col">
+              <ScrollArea className="flex-1">
+                <div className="max-w-5xl mx-auto p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className={`text-2xl font-bold ${textColor}`}>Моя музыка</h2>
+                    <Button onClick={() => setIsAddMusicOpen(true)} className="bg-[#9b87f5] hover:bg-[#8b77e5] rounded-none">
+                      <Icon name="Plus" size={16} className="mr-2" />
+                      Добавить трек
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-4">
+                    {tracks.map((track) => (
+                      <Card 
+                        key={track.id} 
+                        className={`p-0 rounded-none border-2 ${borderColor} overflow-hidden cursor-pointer hover:scale-105 transition-transform ${cardBg}`}
+                        onClick={() => playTrack(track)}
+                      >
+                        <div className="relative">
+                          <img src={track.cover} alt={track.title} className="w-full h-48 object-cover" />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                            <div className="bg-[#9b87f5] p-4">
+                              <Icon name="Play" size={32} className="text-white" />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-4">
+                          <h3 className={`font-semibold ${textColor} truncate`}>{track.title}</h3>
+                          <p className="text-sm text-gray-500 truncate">{track.artist}</p>
+                          <div className="flex justify-between items-center mt-2">
+                            <span className="text-xs text-gray-400">{track.duration}</span>
+                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
+                              <Icon name="MoreVertical" size={14} />
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              </ScrollArea>
+
+              {currentTrack && (
+                <div className={`${cardBg} border-t-2 ${borderColor} p-4`}>
+                  <div className="max-w-5xl mx-auto flex items-center gap-4">
+                    <img src={currentTrack.cover} alt={currentTrack.title} className="w-16 h-16 rounded-none" />
+                    <div className="flex-1">
+                      <h4 className={`font-semibold ${textColor}`}>{currentTrack.title}</h4>
+                      <p className="text-sm text-gray-500">{currentTrack.artist}</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Button variant="ghost" size="icon" className="rounded-none">
+                        <Icon name="SkipBack" size={20} />
+                      </Button>
+                      <Button 
+                        onClick={togglePlay}
+                        className="bg-[#9b87f5] hover:bg-[#8b77e5] rounded-none h-12 w-12"
+                      >
+                        <Icon name={isPlaying ? 'Pause' : 'Play'} size={24} className="text-white" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="rounded-none">
+                        <Icon name="SkipForward" size={20} />
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2 w-32">
+                      <Icon name="Volume2" size={18} className="text-gray-500" />
+                      <Slider 
+                        value={volume} 
+                        onValueChange={setVolume}
+                        max={100}
+                        step={1}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {currentView === 'profile' && (
@@ -800,6 +1085,40 @@ const Index = () => {
               ))}
             </div>
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAddMusicOpen} onOpenChange={setIsAddMusicOpen}>
+        <DialogContent className="rounded-none">
+          <DialogHeader>
+            <DialogTitle>Добавить музыку</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="track-title">Название трека</Label>
+              <Input id="track-title" placeholder="Введите название..." className="rounded-none border-2" />
+            </div>
+            <div>
+              <Label htmlFor="track-artist">Исполнитель</Label>
+              <Input id="track-artist" placeholder="Введите имя исполнителя..." className="rounded-none border-2" />
+            </div>
+            <div>
+              <Label htmlFor="track-file">Аудиофайл</Label>
+              <Input id="track-file" type="file" accept="audio/*" className="rounded-none border-2" />
+            </div>
+            <div>
+              <Label htmlFor="track-cover">Обложка</Label>
+              <Input id="track-cover" type="file" accept="image/*" className="rounded-none border-2" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddMusicOpen(false)} className="rounded-none">
+              Отмена
+            </Button>
+            <Button onClick={() => { setIsAddMusicOpen(false); toast({ title: 'Трек добавлен в библиотеку' }); }} className="bg-[#9b87f5] hover:bg-[#8b77e5] rounded-none">
+              Добавить
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
