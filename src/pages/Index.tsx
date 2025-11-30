@@ -616,13 +616,26 @@ const Index = () => {
   };
 
   const handleSendFriendRequest = (userId: number, userName: string) => {
+    const existingFriend = friendsList.find(f => f.id === userId);
+    if (existingFriend) {
+      toast({ title: 'Этот пользователь уже в друзьях' });
+      return;
+    }
     setSentRequests(prev => new Set(prev).add(userId));
     toast({ title: `Заявка отправлена ${userName}` });
   };
 
   const handleAcceptRequest = (requestId: number, userId: number, name: string, avatar: string) => {
     setFriendRequests(prev => prev.filter(req => req.id !== requestId));
-    setFriendsList(prev => [...prev, { id: userId, name, avatar, status: 'online' }]);
+    const alreadyFriend = friendsList.some(f => f.id === userId);
+    if (!alreadyFriend) {
+      setFriendsList(prev => [...prev, { id: userId, name, avatar, status: 'online' }]);
+    }
+    setSentRequests(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(userId);
+      return newSet;
+    });
     toast({ title: `${name} добавлен в друзья` });
   };
 
@@ -1632,8 +1645,8 @@ const Index = () => {
           <ScrollArea className="h-[400px]">
             <div className="space-y-3">
               {(friendSearchQuery.trim() 
-                ? allUsers.filter(u => u.name.toLowerCase().includes(friendSearchQuery.toLowerCase()))
-                : searchUsers.map(u => allUsers.find(au => au.id === u.id)!).filter(Boolean)
+                ? allUsers.filter(u => u.name.toLowerCase().includes(friendSearchQuery.toLowerCase()) && !friendsList.some(f => f.id === u.id))
+                : searchUsers.map(u => allUsers.find(au => au.id === u.id)!).filter(Boolean).filter(u => !friendsList.some(f => f.id === u.id))
               ).map((user) => (
                 <Card key={user.id} className="p-4 rounded-none border-2 flex items-center gap-4 cursor-pointer hover:bg-[#0078D7]/5 transition-colors">
                   <Avatar 
