@@ -107,6 +107,7 @@ interface UserProfile {
   followers: number;
   status: 'online' | 'offline';
   posts: Post[];
+  friendsList?: Friend[];
 }
 
 interface Track {
@@ -536,6 +537,13 @@ const Index = () => {
       photos: 215,
       followers: 128,
       status: 'online',
+      friendsList: [
+        { id: 2, name: 'Дмитрий Иванов', avatar: 'ДИ', status: 'online' },
+        { id: 3, name: 'Мария Сидорова', avatar: 'МС', status: 'offline' },
+        { id: 5, name: 'Елена Козлова', avatar: 'ЕК', status: 'online' },
+        { id: 10, name: 'Олег Кузнецов', avatar: 'ОК', status: 'offline' },
+        { id: 11, name: 'Ирина Морозова', avatar: 'ИМ', status: 'online' }
+      ],
       posts: [
         {
           id: 101,
@@ -560,6 +568,12 @@ const Index = () => {
       photos: 89,
       followers: 234,
       status: 'online',
+      friendsList: [
+        { id: 1, name: 'Анна Петрова', avatar: 'АП', status: 'online' },
+        { id: 4, name: 'Алексей Смирнов', avatar: 'АС', status: 'offline' },
+        { id: 6, name: 'Сергей Волков', avatar: 'СВ', status: 'offline' },
+        { id: 12, name: 'Павел Лебедев', avatar: 'ПЛ', status: 'online' }
+      ],
       posts: [
         {
           id: 201,
@@ -583,6 +597,10 @@ const Index = () => {
       photos: 156,
       followers: 95,
       status: 'offline',
+      friendsList: [
+        { id: 1, name: 'Анна Петрова', avatar: 'АП', status: 'online' },
+        { id: 13, name: 'Наталья Соколова', avatar: 'НС', status: 'offline' }
+      ],
       posts: []
     }
   ];
@@ -2162,8 +2180,14 @@ const Index = () => {
                 </div>
                 
                 <div className="grid grid-cols-3 gap-4 mb-6">
-                  <Card className="p-4 rounded-none border-2 bg-[#0078D7] text-white">
-                    <div className="text-3xl font-bold">{viewingProfile.friends}</div>
+                  <Card 
+                    className="p-4 rounded-none border-2 bg-[#0078D7] text-white cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => {
+                      const friendsSection = document.getElementById('profile-friends-section');
+                      friendsSection?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                  >
+                    <div className="text-3xl font-bold">{viewingProfile.friendsList?.length || viewingProfile.friends}</div>
                     <div className="text-sm opacity-90">Друзей</div>
                   </Card>
                   <Card className="p-4 rounded-none border-2 bg-[#7FBA00] text-white">
@@ -2195,6 +2219,45 @@ const Index = () => {
                     </div>
                   </div>
                 </div>
+
+                {viewingProfile.friendsList && viewingProfile.friendsList.length > 0 && (
+                  <div id="profile-friends-section" className="mb-6">
+                    <h3 className={`font-bold mb-4 text-lg ${textColor}`}>Друзья ({viewingProfile.friendsList.length})</h3>
+                    <div className="grid grid-cols-4 gap-3">
+                      {viewingProfile.friendsList.map((friend) => {
+                        const friendFullProfile = userProfiles.find(u => u.id === friend.id);
+                        return (
+                          <Card 
+                            key={friend.id} 
+                            className={`p-4 rounded-none border-2 ${borderColor} ${cardBg} cursor-pointer hover:bg-[#0078D7]/5 transition-colors`}
+                            onClick={() => {
+                              if (friendFullProfile) {
+                                handleViewProfile(friendFullProfile.id);
+                              }
+                            }}
+                          >
+                            <div className="flex flex-col items-center text-center">
+                              <div className="relative mb-2">
+                                <Avatar className="h-16 w-16 rounded-none">
+                                  <AvatarFallback className="bg-[#00BCF2] text-white rounded-none font-bold">
+                                    {friend.avatar}
+                                  </AvatarFallback>
+                                </Avatar>
+                                {friend.status === 'online' && (
+                                  <div className="absolute bottom-0 right-0 w-4 h-4 bg-[#7FBA00] border-2 border-white"></div>
+                                )}
+                              </div>
+                              <h4 className={`font-semibold text-sm ${textColor} truncate w-full`}>{friend.name}</h4>
+                              <Badge className={`${friend.status === 'online' ? 'bg-[#7FBA00]' : 'bg-gray-400'} rounded-none text-xs mt-1`}>
+                                {friend.status === 'online' ? 'В сети' : 'Офлайн'}
+                              </Badge>
+                            </div>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {viewingProfile.posts.length > 0 && (
                   <div>
