@@ -127,6 +127,16 @@ const Index = () => {
   const [subscribedUsers, setSubscribedUsers] = useState<Set<number>>(new Set());
   const [viewingImage, setViewingImage] = useState<{ url: string; format: string } | null>(null);
   const [imageViewMode, setImageViewMode] = useState<'fit' | 'fill' | 'original'>('fit');
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [friendSearchQuery, setFriendSearchQuery] = useState('');
+  const [friendsList, setFriendsList] = useState<Friend[]>([
+    { id: 1, name: 'Анна Петрова', avatar: 'АП', status: 'online' },
+    { id: 2, name: 'Дмитрий Иванов', avatar: 'ДИ', status: 'online' },
+    { id: 3, name: 'Мария Сидорова', avatar: 'МС', status: 'offline' },
+    { id: 4, name: 'Алексей Смирнов', avatar: 'АС', status: 'offline' },
+    { id: 5, name: 'Елена Козлова', avatar: 'ЕК', status: 'online' },
+    { id: 6, name: 'Сергей Волков', avatar: 'СВ', status: 'offline' }
+  ]);
   const [settings, setSettings] = useState({
     privacy: {
       profileVisibility: 'everyone',
@@ -426,14 +436,38 @@ const Index = () => {
     setIsPlaying(!isPlaying);
   };
 
-  const friends: Friend[] = [
-    { id: 1, name: 'Анна Петрова', avatar: 'АП', status: 'online' },
-    { id: 2, name: 'Дмитрий Иванов', avatar: 'ДИ', status: 'online' },
-    { id: 3, name: 'Мария Сидорова', avatar: 'МС', status: 'offline' },
-    { id: 4, name: 'Алексей Смирнов', avatar: 'АС', status: 'offline' },
-    { id: 5, name: 'Елена Козлова', avatar: 'ЕК', status: 'online' },
-    { id: 6, name: 'Сергей Волков', avatar: 'СВ', status: 'offline' }
+  const handleRemoveFriend = (friendId: number) => {
+    const friend = friendsList.find(f => f.id === friendId);
+    setFriendsList(prev => prev.filter(f => f.id !== friendId));
+    toast({ title: `${friend?.name} удалён из друзей` });
+  };
+
+  const filteredFriends = friendsList.filter(friend => 
+    friend.name.toLowerCase().includes(friendSearchQuery.toLowerCase())
+  );
+
+  const allUsers = [
+    ...userProfiles,
+    ...searchUsers.map(u => ({
+      id: u.id,
+      name: u.name,
+      avatar: u.avatar,
+      bio: 'Пользователь сети',
+      location: 'Россия',
+      work: '-',
+      friends: u.mutualFriends * 10,
+      photos: 0,
+      followers: 0,
+      status: 'offline' as const,
+      posts: []
+    }))
   ];
+
+  const filteredSearchResults = globalSearchQuery.trim() 
+    ? allUsers.filter(user => 
+        user.name.toLowerCase().includes(globalSearchQuery.toLowerCase())
+      )
+    : [];
 
   const [conversations, setConversations] = useState<Conversation[]>([
     { 
@@ -774,14 +808,49 @@ const Index = () => {
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-[#0078D7] text-white p-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight">МояСеть</h1>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 relative">
             <Input 
               placeholder="Поиск..." 
               className="w-80 bg-white/20 border-0 text-white placeholder:text-white/60 rounded-none"
+              value={globalSearchQuery}
+              onChange={(e) => setGlobalSearchQuery(e.target.value)}
             />
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20 rounded-none">
-              <Icon name="Search" size={20} />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-white hover:bg-white/20 rounded-none"
+              onClick={() => setGlobalSearchQuery('')}
+            >
+              {globalSearchQuery ? <Icon name="X" size={20} /> : <Icon name="Search" size={20} />}
             </Button>
+            
+            {filteredSearchResults.length > 0 && (
+              <div className={`absolute top-full right-0 mt-2 w-96 ${cardBg} border-2 ${borderColor} rounded-none shadow-xl z-50 max-h-96 overflow-y-auto`}>
+                {filteredSearchResults.map((user) => (
+                  <button
+                    key={user.id}
+                    onClick={() => {
+                      handleViewProfile(user.id);
+                      setGlobalSearchQuery('');
+                    }}
+                    className={`w-full p-4 flex items-center gap-3 border-b ${borderColor} hover:bg-[#0078D7]/10 transition-colors text-left`}
+                  >
+                    <Avatar className="h-12 w-12 rounded-none">
+                      <AvatarFallback className="bg-[#00BCF2] text-white rounded-none font-bold">
+                        {user.avatar}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className={`font-semibold ${textColor}`}>{user.name}</div>
+                      <div className="text-sm text-gray-500">{user.work}</div>
+                    </div>
+                    {user.status === 'online' && (
+                      <Badge className="bg-[#7FBA00] rounded-none text-xs">В сети</Badge>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </header>
 
@@ -1158,59 +1227,81 @@ const Index = () => {
             <ScrollArea className="h-full">
               <div className="max-w-5xl mx-auto p-6">
                 <div className="mb-6">
-                  <h2 className={`text-2xl font-bold mb-4 ${textColor}`}>Мои друзья</h2>
-                  <div className="flex gap-2">
-                    <Button className="bg-[#0078D7] hover:bg-[#005a9e] rounded-none">
-                      Все друзья
-                    </Button>
-                    <Button variant="outline" className="rounded-none border-2">
-                      Заявки в друзья
-                    </Button>
-                    <Button onClick={() => setIsFindFriendsOpen(true)} variant="outline" className="rounded-none border-2">
-                      <Icon name="Search" size={16} className="mr-2" />
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className={`text-2xl font-bold ${textColor}`}>Мои друзья ({friendsList.length})</h2>
+                    <Button onClick={() => setIsFindFriendsOpen(true)} className="bg-[#0078D7] hover:bg-[#005a9e] rounded-none">
+                      <Icon name="UserPlus" size={16} className="mr-2" />
                       Найти друзей
                     </Button>
                   </div>
+                  <Input 
+                    placeholder="Поиск среди друзей..." 
+                    className="rounded-none border-2 mb-4"
+                    value={friendSearchQuery}
+                    onChange={(e) => setFriendSearchQuery(e.target.value)}
+                  />
                 </div>
-                <div className="grid grid-cols-3 gap-4">
-                  {friends.map((friend) => {
-                    const friendProfile = userProfiles.find(u => u.name === friend.name);
-                    return (
-                    <Card key={friend.id} className={`p-6 rounded-none border-2 ${borderColor} ${cardBg}`}>
-                      <div className="flex flex-col items-center text-center">
-                        <div className="relative mb-3">
-                          <Avatar 
-                            className="h-24 w-24 rounded-none cursor-pointer hover:opacity-80 transition-opacity"
+                {filteredFriends.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Icon name="Users" size={64} className="mx-auto mb-4 text-gray-400 opacity-50" />
+                    <p className="text-gray-500 text-lg">
+                      {friendSearchQuery ? 'Друзья не найдены' : 'У вас пока нет друзей'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-4">
+                    {filteredFriends.map((friend) => {
+                      const friendProfile = userProfiles.find(u => u.name === friend.name);
+                      return (
+                      <Card key={friend.id} className={`p-6 rounded-none border-2 ${borderColor} ${cardBg}`}>
+                        <div className="flex flex-col items-center text-center">
+                          <div className="relative mb-3">
+                            <Avatar 
+                              className="h-24 w-24 rounded-none cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={() => friendProfile && handleViewProfile(friendProfile.id)}
+                            >
+                              <AvatarFallback className="bg-[#00BCF2] text-white rounded-none text-2xl font-bold">
+                                {friend.avatar}
+                              </AvatarFallback>
+                            </Avatar>
+                            {friend.status === 'online' && (
+                              <div className="absolute bottom-0 right-0 w-6 h-6 bg-[#7FBA00] border-2 border-white"></div>
+                            )}
+                          </div>
+                          <h3 
+                            className={`font-semibold mb-2 ${textColor} truncate w-full cursor-pointer hover:text-[#0078D7] transition-colors`}
                             onClick={() => friendProfile && handleViewProfile(friendProfile.id)}
-                          >
-                            <AvatarFallback className="bg-[#00BCF2] text-white rounded-none text-2xl font-bold">
-                              {friend.avatar}
-                            </AvatarFallback>
-                          </Avatar>
-                          {friend.status === 'online' && (
-                            <div className="absolute bottom-0 right-0 w-6 h-6 bg-[#7FBA00] border-2 border-white"></div>
-                          )}
+                          >{friend.name}</h3>
+                          <Badge className={`${friend.status === 'online' ? 'bg-[#7FBA00]' : 'bg-gray-400'} rounded-none`}>
+                            {friend.status === 'online' ? 'В сети' : 'Не в сети'}
+                          </Badge>
+                          <div className="flex gap-2 mt-4 w-full">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="flex-1 rounded-none border-2"
+                              onClick={() => {
+                                setCurrentView('messages');
+                                setSelectedChat(friend.id);
+                              }}
+                            >
+                              <Icon name="MessageSquare" size={14} />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="flex-1 rounded-none border-2 text-[#E81123] hover:text-[#E81123] hover:bg-[#E81123]/10"
+                              onClick={() => handleRemoveFriend(friend.id)}
+                            >
+                              <Icon name="UserMinus" size={14} />
+                            </Button>
+                          </div>
                         </div>
-                        <h3 
-                          className={`font-semibold mb-2 ${textColor} truncate w-full cursor-pointer hover:text-[#0078D7] transition-colors`}
-                          onClick={() => friendProfile && handleViewProfile(friendProfile.id)}
-                        >{friend.name}</h3>
-                        <Badge className={`${friend.status === 'online' ? 'bg-[#7FBA00]' : 'bg-gray-400'} rounded-none`}>
-                          {friend.status === 'online' ? 'В сети' : 'Не в сети'}
-                        </Badge>
-                        <div className="flex gap-2 mt-4 w-full">
-                          <Button variant="outline" size="sm" className="flex-1 rounded-none border-2">
-                            <Icon name="MessageSquare" size={14} />
-                          </Button>
-                          <Button variant="outline" size="sm" className="flex-1 rounded-none border-2">
-                            <Icon name="UserMinus" size={14} />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  );
-                  })}
-                </div>
+                      </Card>
+                    );
+                    })}
+                  </div>
+                )}
               </div>
             </ScrollArea>
           )}
@@ -1455,24 +1546,51 @@ const Index = () => {
             <DialogTitle>Найти друзей</DialogTitle>
           </DialogHeader>
           <div className="mb-4">
-            <Input placeholder="Поиск людей..." className="rounded-none border-2" />
+            <Input 
+              placeholder="Поиск людей..." 
+              className="rounded-none border-2"
+              value={friendSearchQuery}
+              onChange={(e) => setFriendSearchQuery(e.target.value)}
+            />
           </div>
           <ScrollArea className="h-[400px]">
             <div className="space-y-3">
-              {searchUsers.map((user) => (
-                <Card key={user.id} className="p-4 rounded-none border-2 flex items-center gap-4">
-                  <Avatar className="h-16 w-16 rounded-none">
+              {(friendSearchQuery.trim() 
+                ? allUsers.filter(u => u.name.toLowerCase().includes(friendSearchQuery.toLowerCase()))
+                : searchUsers.map(u => allUsers.find(au => au.id === u.id)!).filter(Boolean)
+              ).map((user) => (
+                <Card key={user.id} className="p-4 rounded-none border-2 flex items-center gap-4 cursor-pointer hover:bg-[#0078D7]/5 transition-colors">
+                  <Avatar 
+                    className="h-16 w-16 rounded-none"
+                    onClick={() => {
+                      handleViewProfile(user.id);
+                      setIsFindFriendsOpen(false);
+                      setFriendSearchQuery('');
+                    }}
+                  >
                     <AvatarFallback className="bg-[#00BCF2] text-white rounded-none text-xl font-bold">
                       {user.avatar}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="flex-1">
+                  <div 
+                    className="flex-1"
+                    onClick={() => {
+                      handleViewProfile(user.id);
+                      setIsFindFriendsOpen(false);
+                      setFriendSearchQuery('');
+                    }}
+                  >
                     <h4 className="font-semibold">{user.name}</h4>
-                    <p className="text-sm text-gray-500">{user.mutualFriends} общих друзей</p>
+                    <p className="text-sm text-gray-500">{user.work}</p>
                   </div>
-                  <Button onClick={() => handleAddFriend(user.name)} className="bg-[#7FBA00] hover:bg-[#6a9e00] rounded-none">
-                    <Icon name="UserPlus" size={16} className="mr-2" />
-                    Добавить
+                  <Button 
+                    onClick={() => {
+                      handleSubscribe(user.id);
+                    }} 
+                    className={`${subscribedUsers.has(user.id) ? 'bg-gray-500 hover:bg-gray-600' : 'bg-[#7FBA00] hover:bg-[#6a9e00]'} rounded-none`}
+                  >
+                    <Icon name={subscribedUsers.has(user.id) ? 'UserCheck' : 'UserPlus'} size={16} className="mr-2" />
+                    {subscribedUsers.has(user.id) ? 'Подписан' : 'Подписаться'}
                   </Button>
                 </Card>
               ))}
